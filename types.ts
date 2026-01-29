@@ -1,0 +1,134 @@
+export enum GameState {
+  MENU = 'MENU',
+  START = 'START',
+  PLAYING = 'PLAYING',
+  GAMEOVER = 'GAMEOVER',
+}
+
+export enum ObstacleType {
+  CANDLE = 'CANDLE',
+  LINK = 'LINK',
+  HALT = 'HALT',
+  // Portal removed as per request
+}
+
+export interface Entity {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Player extends Entity {
+  vy: number; // Vertical velocity
+  isJumping: boolean;
+  color: string;
+}
+
+export interface Obstacle extends Entity {
+  type: ObstacleType;
+  passed: boolean; // For scoring or internal logic
+}
+
+export interface Coin extends Entity {
+  collected: boolean;
+  value: number;
+}
+
+export interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  color: string;
+  size: number;
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  tokenAddress: string;
+  pairAddress: string; // DexScreener pair address for API calls
+  initialMarketCap: number; // Set on room entry, stays constant (1.00x baseline)
+  currentMarketCap: number; // Updated real-time every 10s
+  previousMarketCap: number; // For tracking direction (flash green/red)
+  themeColor: string; // Hex for background tint
+  multiplier: number; // Calculated using sensitivity formula
+  flashState: 'none' | 'green' | 'red'; // For visual feedback
+  isLoading: boolean; // Loading state during initial fetch
+  isMeta: boolean; // true = Meta Coin (preset), false = Created Coin (user added)
+  priceHistory: PricePoint[]; // Historical price data for dynamic chart
+  // New metadata fields from DexScreener
+  ticker: string; // Symbol like "BONK", "WIF"
+  logoUrl: string | null; // Token logo URL from DexScreener
+  pairName: string | null; // Pair name like "BONK/SOL"
+  liquidity: number; // Current liquidity in USD
+  lastFetchError: boolean; // True if last fetch failed
+  lastAccessed: number; // Timestamp for auto-cleanup (5 min inactivity)
+}
+
+// Price point for chart visualization
+export interface PricePoint {
+  timestamp: number;
+  marketCap: number;
+  normalizedValue: number; // 0-1 scale relative to initial market cap
+}
+
+// DexScreener API response types
+export interface DexScreenerPair {
+  pairAddress: string;
+  baseToken: {
+    address: string;
+    name: string;
+    symbol: string;
+  };
+  quoteToken: {
+    symbol: string;
+  };
+  priceUsd: string;
+  fdv: number;
+  marketCap: number;
+  liquidity: {
+    usd: number;
+  };
+  info?: {
+    imageUrl?: string;
+  };
+}
+
+export interface DexScreenerResponse {
+  pairs: DexScreenerPair[] | null;
+}
+
+
+export interface SkinSettings {
+  id: string;
+  name: string;
+  hoodieColor: string;
+  pantsColor: string;
+  skinColor: string;
+  accessory: 'none' | 'sunglasses' | 'hat' | 'cap' | 'headphones' | 'bandana' | 'tophat' | 'crown' | 'mask' | 'visor';
+  accessoryColor?: string;
+}
+
+export enum SkillType {
+  LONG_JUMP = 'LONG_JUMP',
+  SPEED_BOOST = 'SPEED_BOOST',
+  SLOW_MOTION = 'SLOW_MOTION',
+  SHIELD = 'SHIELD',
+  INVISIBILITY = 'INVISIBILITY',
+  MAGNET = 'MAGNET',
+}
+
+export interface Skill {
+  id: string;
+  type: SkillType;
+  name: string;
+  description: string;
+  durationMs: number; // Duration of effect
+  cooldownMs: number; // Time before reuse
+  cost: number;
+  triggerKey?: string; // e.g. 'S', 'Z'
+  icon: string; // Emoji character for now
+}
