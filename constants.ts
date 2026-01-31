@@ -170,6 +170,11 @@ export const SKINS: import('./types').SkinSettings[] = [
   // SPECIALS
   { id: 'penguin', name: 'Pudgy', hoodieColor: '#0f172a', pantsColor: '#fff', skinColor: '#fff', accessory: 'none', model: 'penguin' },
   { id: 'lobster', name: 'Lobster DAO', hoodieColor: '#dc2626', pantsColor: '#991b1b', skinColor: '#ef4444', accessory: 'none', model: 'lobster' },
+
+  // NEW ICONS
+  { id: 'wif', name: 'dogwifhat', hoodieColor: '#d6b483', pantsColor: '#d6b483', skinColor: '#d6b483', accessory: 'hat', accessoryColor: '#ec4899', model: 'dog' },
+  { id: 'trump', name: 'The Trump', hoodieColor: '#0f172a', pantsColor: '#0f172a', skinColor: '#ffcc99', accessory: 'hair', accessoryColor: '#facc15', model: 'human', footwear: 'shoes' },
+  { id: 'solana', name: 'Solana Man', hoodieColor: '#9945FF', pantsColor: '#14F195', skinColor: '#fca5a5', accessory: 'sunglasses', model: 'human', footwear: 'sneakers' },
 ];
 
 // ===========================================
@@ -194,7 +199,7 @@ export const SKILLS: import('./types').Skill[] = [
     durationMs: 10000,
     cooldownMs: 20000,
     cost: 0,
-    triggerKey: 'S',
+    triggerKey: undefined,
     icon: '🚀'
   },
   {
@@ -205,7 +210,7 @@ export const SKILLS: import('./types').Skill[] = [
     durationMs: 10000,
     cooldownMs: 20000,
     cost: 300,
-    triggerKey: 'Z',
+    triggerKey: undefined,
     icon: '⏳'
   },
   {
@@ -227,7 +232,7 @@ export const SKILLS: import('./types').Skill[] = [
     durationMs: 7000,
     cooldownMs: 50000,
     cost: 750,
-    triggerKey: 'I',
+    triggerKey: undefined,
     icon: '👻'
   },
   {
@@ -238,7 +243,62 @@ export const SKILLS: import('./types').Skill[] = [
     durationMs: 10000, // Magnet duration
     cooldownMs: 999999, // Effectively infinite (one use)
     cost: 600,
-    triggerKey: 'M',
+    triggerKey: undefined,
     icon: '🧲'
+  },
+  {
+    id: 'diamond_hands',
+    type: SkillType.DIAMOND_HANDS,
+    name: 'Diamond Hands',
+    description: 'Double all coin values for 10 seconds! 💎🙌',
+    durationMs: 10000,
+    cooldownMs: 30000,
+    cost: 100, // Cheap
+    triggerKey: undefined,
+    icon: '💎'
+  },
+  {
+    id: 'whale_mode',
+    type: SkillType.WHALE_MODE,
+    name: 'Whale Mode',
+    description: 'Become a GIANT WHALE! Invincible and smash everything!',
+    durationMs: 8000,
+    cooldownMs: 45000,
+    cost: 1000,
+    triggerKey: undefined,
+    icon: '🐋'
+  },
+  {
+    id: 'laser_eyes',
+    type: SkillType.LASER_EYES,
+    name: 'Laser Eyes',
+    description: 'Shoot lasers to destroy FUD (obstacles) in your path!',
+    durationMs: 12000,
+    cooldownMs: 25000,
+    cost: 500,
+    triggerKey: undefined,
+    icon: '👀'
+  },
+  {
+    id: 'moon_boots', // Replaced old long jump with this better version or standard
+    type: SkillType.TO_THE_MOON,
+    name: 'To The Moon',
+    description: 'Defy gravity! Fly over the chart like a pumps!',
+    durationMs: 5000,
+    cooldownMs: 30000,
+    cost: 800,
+    triggerKey: undefined,
+    icon: '🚀'
+  },
+  {
+    id: 'rug_insurance',
+    type: SkillType.RUG_INSURANCE,
+    name: 'Rug Insurance',
+    description: 'Passive: Auto-revive once if you get rugged (die).',
+    durationMs: 0,
+    cooldownMs: 0,
+    cost: 2000,
+    triggerKey: undefined, // Passive
+    icon: '📜'
   }
 ];

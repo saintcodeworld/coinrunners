@@ -47,8 +47,23 @@ export const drawPlayer = (ctx: CanvasRenderingContext2D, player: Player, frameT
       drawPixelRect(ctx, fx - 1, fy + fh - 2, fw + 2, 2, 'white'); // Sole
     } else if (footwear === 'flippers') {
       drawPixelRect(ctx, fx - 4, fy + fh - 2, fw + 8, 3, '#0ea5e9'); // Blue flipper
+    } else if (footwear === 'shoes') {
+      drawPixelRect(ctx, fx - 1, fy + fh - 4, fw + 2, 4, 'black'); // Black dress shoe
+      drawPixelRect(ctx, fx - 1, fy + fh - 1, fw + 2, 1, '#333'); // Sole
     }
   };
+
+  if (model === 'penguin') {
+    // ... (Penguin code remains the same, omitted for brevity if I could, but I must replace the block.
+    // Wait, I am using replace_file_content with a range. I should probably target the specific blocks or use multi_replace.
+    // I will use multi_replace if I need to touch multiple places, but here I can just inject the footwear logic in the helper
+    // and then the accessory logic later.
+    // Actually, I am editing the `drawFootwear` helper and the `accessory` block. They are far apart.
+    // I will use multi_replace.
+    // Wait, the previous tool call loop handles one tool at a time.
+    // To be safe and clean, I will use `multi_replace`.
+  }
+
 
   if (model === 'penguin') {
     // === PENGUIN MODEL ===
@@ -144,6 +159,53 @@ export const drawPlayer = (ctx: CanvasRenderingContext2D, player: Player, frameT
     drawPixelRect(ctx, x + 8, drawY + 30, 4, 8, secondaryColor);
     drawPixelRect(ctx, x + 18, drawY + 30, 4, 8, secondaryColor);
     drawPixelRect(ctx, x + 28, drawY + 30, 4, 8, secondaryColor);
+
+  } else if (model === 'dog') {
+    // === DOG MODEL (Dogwifhat style) ===
+    // Colors derived from props or defaults
+    const furColor = hoodieColor; // Main body/fur
+    const hatColor = accessoryColor || '#ec4899'; // Default pink for wif hat
+
+    // Body (Little quadruped standing up like a person for game mechanics)
+    // Actually, let's make it look like the meme (sitting/standing dog)
+
+    // Body / Chest
+    drawPixelRect(ctx, x + 10, drawY + 18, 20, 18, furColor);
+
+    // Head (Shiba style)
+    drawPixelRect(ctx, x + 8, drawY + 2, 24, 16, furColor);
+
+    // Ears
+    drawPixelRect(ctx, x + 6, drawY - 2, 6, 6, furColor);
+    drawPixelRect(ctx, x + 28, drawY - 2, 6, 6, furColor);
+
+    // Snout
+    drawPixelRect(ctx, x + 16, drawY + 10, 8, 6, '#fff7ed'); // Lighter muzzle
+    drawPixelRect(ctx, x + 18, drawY + 10, 4, 2, 'black'); // Nose
+
+    // Eyes
+    drawPixelRect(ctx, x + 12, drawY + 6, 4, 4, 'black');
+    drawPixelRect(ctx, x + 24, drawY + 6, 4, 4, 'black');
+
+    // THE HAT (Beanie)
+    if (accessory === 'hat') {
+      drawPixelRect(ctx, x + 6, drawY - 4, 28, 8, hatColor); // Main band
+      drawPixelRect(ctx, x + 10, drawY - 8, 20, 6, hatColor); // Top dome
+    }
+
+    // Legs/Paws
+    if (player.isJumping) {
+      drawPixelRect(ctx, x + 10, drawY + 34, 6, 6, furColor);
+      drawPixelRect(ctx, x + 24, drawY + 34, 6, 6, furColor);
+    } else {
+      const legPhase = Math.sin(frameTick * 0.5);
+      drawPixelRect(ctx, x + 10, drawY + 36 + (legPhase * 2), 6, 6, furColor);
+      drawPixelRect(ctx, x + 24, drawY + 36 - (legPhase * 2), 6, 6, furColor);
+    }
+
+    // Arms/Forelegs
+    drawPixelRect(ctx, x + 4, drawY + 22, 6, 10, furColor);
+    drawPixelRect(ctx, x + 30, drawY + 22, 6, 10, furColor);
 
   } else {
     // === HUMAN / STANDARD MODEL ===
@@ -246,6 +308,14 @@ export const drawPlayer = (ctx: CanvasRenderingContext2D, player: Player, frameT
       ctx.shadowColor = accColor; ctx.shadowBlur = 5;
       ctx.fillStyle = 'white'; ctx.fillRect(cx - 5, hy + 2, 10, 2);
       ctx.shadowBlur = 0;
+    } else if (accessory === 'hair') {
+      // Custom Hair (Trump style combover)
+      drawPixelRect(ctx, hx - 2, hy - 4, hw + 4, 8, accColor); // Main bulk
+      drawPixelRect(ctx, hx - 4, hy - 2, 4, 8, accColor); // Left puff
+      drawPixelRect(ctx, hx + hw - 2, hy + 2, 4, 6, accColor); // Right side
+      // Eyes
+      drawPixelRect(ctx, cx + 2, hy + 5 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 8, hy + 5 * headScale, 4, 4, 'black');
     } else {
       // None/Default eyes
       drawPixelRect(ctx, cx + 2, hy + 3 * headScale, 4, 4, 'black');
@@ -259,6 +329,14 @@ export const drawPlayer = (ctx: CanvasRenderingContext2D, player: Player, frameT
     } else {
       drawPixelRect(ctx, x + 25, drawY + 8, 8, 12, hoodieColor);
     }
+  }
+
+  // Easter Egg: Trump Tie
+  if (skin?.id === 'trump') {
+    // Red Tie
+    const bw = 30 * bodyScale;
+    const bx = x + (40 - bw) / 2;
+    drawPixelRect(ctx, bx + bw / 2 - 2, drawY + 14, 4, 12, '#ef4444');
   }
 
   ctx.restore();
@@ -454,30 +532,14 @@ export const drawDynamicChartBackground = (
   const chartHeight = chartBottom - chartTop;
   const centerY = chartTop + chartHeight / 2;
 
-  // Price Scaling - Auto Range
-  let minCap = initialMarketCap;
-  let maxCap = initialMarketCap;
-
-  if (priceHistory.length > 0) {
-    priceHistory.forEach(p => {
-      if (p.marketCap < minCap) minCap = p.marketCap;
-      if (p.marketCap > maxCap) maxCap = p.marketCap;
-    });
-  }
-
-  // Ensure there is some range to avoid division by zero
-  const range = maxCap - minCap;
-  const padding = range === 0 ? (initialMarketCap * 0.05) : (range * 0.1); // 10% padding
-
-  const plotMin = minCap - padding;
-  const plotMax = maxCap + padding;
-  const plotRange = Math.max(0.000001, plotMax - plotMin); // Avoid div by zero
+  // Price Scaling
+  const maxDeviation = 0.20;
 
   const normalizePrice = (marketCap: number): number => {
-    // Map [plotMin, plotMax] to [chartBottom, chartTop]
-    // Note: Canvas Y is inverted (0 is top)
-    const ratio = (marketCap - plotMin) / plotRange;
-    return chartBottom - (ratio * chartHeight);
+    if (initialMarketCap <= 0) return centerY;
+    const percentChange = (marketCap - initialMarketCap) / initialMarketCap;
+    const clampedChange = Math.max(-maxDeviation, Math.min(maxDeviation, percentChange));
+    return centerY - (clampedChange / maxDeviation) * (chartHeight / 2);
   };
 
   // Helper to get base trend Y at screen X

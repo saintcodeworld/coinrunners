@@ -51,9 +51,13 @@ const fetchDexScreenerData = async (tokenAddress: string): Promise<FetchResult> 
 
     if (data.pairs && data.pairs.length > 0) {
       // Pick the pair with highest liquidity for accurate tracking
-      const sortedPairs = [...data.pairs].sort(
-        (a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
-      );
+      // Prefer Solana chain if multiple exist
+      const sortedPairs = [...data.pairs].sort((a, b) => {
+        if (a.chainId === 'solana' && b.chainId !== 'solana') return -1;
+        if (b.chainId === 'solana' && a.chainId !== 'solana') return 1;
+        return (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0);
+      });
+
       const bestPair = sortedPairs[0];
 
       const marketCap = bestPair.fdv || bestPair.marketCap || 0;
@@ -63,9 +67,10 @@ const fetchDexScreenerData = async (tokenAddress: string): Promise<FetchResult> 
       const liquidity = bestPair.liquidity?.usd || 0;
       const priceUsd = parseFloat(bestPair.priceUsd || '0');
 
-      if (marketCap > 0) {
+      // We allow success if we have a price, even if MC is 0
+      if (priceUsd > 0) {
         return {
-          marketCap,
+          marketCap: marketCap || (priceUsd * 500000000), // Very rough estimate if MC is 0 (total supply fallback)
           ticker,
           logoUrl,
           pairName,
@@ -160,14 +165,20 @@ function App() {
       // SOL TOKEN ADDRESS (Wrapped SOL on DexScreener)
       const SOL_ADDR = 'So11111111111111111111111111111111111111112';
       const res = await fetchDexScreenerData(SOL_ADDR);
+
       if (res.success && res.priceUsd > 0) {
         setSolPrice(res.priceUsd);
+      } else if (solPrice === 0) {
+        // Fallback price if API fails and we have no price yet
+        // This ensures the withdrawal feature is usable even if DexScreener is down
+        console.warn('Using fallback SOL price');
+        setSolPrice(100);
       }
     };
     fetchSol(); // Initial
     const interval = setInterval(fetchSol, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [solPrice]);
 
   // Handle Withdraw (Deduct Balance)
   const handleWithdraw = (amountUsd: number) => {
@@ -209,6 +220,13 @@ function App() {
   const [ownedSkills, setOwnedSkills] = useState<string[]>(SKILLS.map(s => s.id));
   const [selectedSkinId, setSelectedSkinId] = useState<string>('default');
   const [activeSkillIds, setActiveSkillIds] = useState<string[]>([]);
+  const [caAddress, setCaAddress] = useState<string>(() => {
+    return localStorage.getItem('degen_runners_ca_address') || '';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('degen_runners_ca_address', caAddress);
+  }, [caAddress]);
 
   const selectedSkin = useMemo(() => SKINS.find(s => s.id === selectedSkinId) || SKINS[0], [selectedSkinId]);
   const activeSkills = useMemo(() => SKILLS.filter(s => activeSkillIds.includes(s.id)), [activeSkillIds]);
@@ -282,14 +300,24 @@ function App() {
     }
   }, []);
 
+  // Ref to hold the latest metaCoins state for the interval to access
+  const metaCoinsRef = useRef<Room[]>(metaCoins);
+
+  // Sync ref with state
+  useEffect(() => {
+    metaCoinsRef.current = metaCoins;
+  }, [metaCoins]);
+
   // ===========================================
   // AUTO REFRESH DASHBOARD DATA
   // ===========================================
   useEffect(() => {
     const fetchAllMetaCoins = async () => {
-      console.log('Refreshing dashboard data...');
+      // Use the REF to get the current list of coins to we respect user additions/deletions
+      const currentCoins = metaCoinsRef.current;
+      if (!currentCoins || currentCoins.length === 0) return;
 
-      const updates = await Promise.all(META_COINS.map(async (coin) => {
+      const updates = await Promise.all(currentCoins.map(async (coin) => {
         const result = await fetchDexScreenerData(coin.tokenAddress);
         if (result.success && result.marketCap > 0) {
           return {
@@ -309,13 +337,16 @@ function App() {
 
       // Only update if we got valid data
       setMetaCoins(prev => {
-        return updates.map(update => {
+        // We create a map of updates for O(1) lookup
+        const updateMap = new Map(updates.map(u => [u.id, u]));
+
+        return prev.map(coin => {
           // If we are currently PLAYING this room, don't overwrite it with dashboard data
-          // to avoid messing up the game state loop
-          if (activeRoomRef.current && activeRoomRef.current.id === update.id) {
+          if (activeRoomRef.current && activeRoomRef.current.id === coin.id) {
             return activeRoomRef.current;
           }
-          return update;
+          // Return the updated version if available, otherwise keep existing
+          return updateMap.get(coin.id) || coin;
         });
       });
     };
@@ -330,21 +361,41 @@ function App() {
   }, []);
 
   // ===========================================
-  // AUTO CLEANUP INACTIVE COINS (5 MINS)
+  // AUTO CLEANUP INACTIVE COINS
   // ===========================================
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
-      const FIVE_MINUTES = 5 * 60 * 1000;
+      const DEFAULT_TIMEOUT = 5 * 60 * 1000; // 5 mins
 
-      setCreatedCoins(prev => prev.filter(coin => {
-        // Always keep if it is the currently active room
+      // Helper to check if a coin should be kept
+      const shouldKeepCoin = (coin: Room) => {
+        // Always keep if currently playing
         if (activeRoomRef.current && activeRoomRef.current.id === coin.id) return true;
 
-        // Remove if inactive for > 5 minutes
-        // Used || 0 to handle migration from old data without lastAccessed
-        return (now - (coin.lastAccessed || 0)) < FIVE_MINUTES;
-      }));
+        // Clean up if it has a cleanup duration set
+        if (coin.cleanupDuration && coin.cleanupDuration > 0) {
+          const timeout = coin.cleanupDuration * 60 * 1000;
+          return (now - (coin.lastAccessed || 0)) < timeout;
+        }
+
+        // Standard custom coins (not meta) have default 5 min timeout
+        if (!coin.isMeta) {
+          return (now - (coin.lastAccessed || 0)) < DEFAULT_TIMEOUT;
+        }
+
+        // By default, keep Meta coins unless they have explicit timeout
+        return true;
+      };
+
+      setCreatedCoins(prev => prev.filter(shouldKeepCoin));
+      setMetaCoins(prev => {
+        const filtered = prev.filter(shouldKeepCoin);
+        // Only update state if something actually changed to avoid re-renders/infinite loops
+        if (filtered.length !== prev.length) return filtered;
+        return prev;
+      });
+
     }, 10000); // Check every 10 seconds
 
     return () => clearInterval(cleanupInterval);
@@ -354,18 +405,16 @@ function App() {
   // SAVE CUSTOM COINS TO LOCALSTORAGE
   // ===========================================
   useEffect(() => {
-    if (createdCoins.length > 0) {
-      try {
-        // Don't save priceHistory to localStorage (too large)
-        const toSave = createdCoins.map(c => ({
-          ...c,
-          priceHistory: [],
-          isLoading: true,
-        }));
-        localStorage.setItem(CUSTOM_COINS_KEY, JSON.stringify(toSave));
-      } catch (e) {
-        console.error('Failed to save custom coins:', e);
-      }
+    try {
+      // Don't save priceHistory to localStorage (too large)
+      const toSave = createdCoins.map(c => ({
+        ...c,
+        priceHistory: [],
+        isLoading: true,
+      }));
+      localStorage.setItem(CUSTOM_COINS_KEY, JSON.stringify(toSave));
+    } catch (e) {
+      console.error('Failed to save custom coins:', e);
     }
   }, [createdCoins]);
 
@@ -637,8 +686,12 @@ function App() {
     // MUST clear all active intervals first
     cleanup();
 
-    // Update lastAccessed timestamp for this room to prevent auto-cleanup while active
-    if (!room.isMeta) {
+    // Update lastAccessed timestamp to prevent auto-cleanup
+    if (room.isMeta) {
+      setMetaCoins(prev => prev.map(c =>
+        c.id === room.id ? { ...c, lastAccessed: Date.now() } : c
+      ));
+    } else {
       setCreatedCoins(prev => prev.map(c =>
         c.id === room.id ? { ...c, lastAccessed: Date.now() } : c
       ));
@@ -755,7 +808,16 @@ function App() {
   // ===========================================
 
   if (window.location.pathname === '/admin') {
-    return <AdminPanel metaCoins={metaCoins} setMetaCoins={setMetaCoins} />;
+    return (
+      <AdminPanel
+        metaCoins={metaCoins}
+        setMetaCoins={setMetaCoins}
+        createdCoins={createdCoins}
+        setCreatedCoins={setCreatedCoins}
+        caAddress={caAddress}
+        setCaAddress={setCaAddress}
+      />
+    );
   }
 
   return (
@@ -794,6 +856,7 @@ function App() {
               equipSkill={equipSkill}
               selectedSkinId={selectedSkinId}
               activeSkillIds={activeSkillIds}
+              caAddress={caAddress}
             />
 
             <div className="fixed bottom-4 text-slate-500 text-xs text-center w-full pixel-font">
@@ -842,6 +905,7 @@ function App() {
             equipSkill={equipSkill}
             selectedSkinId={selectedSkinId}
             activeSkillIds={activeSkillIds}
+            caAddress={caAddress}
           />
 
           {/* Scanlines Effect Overlay */}

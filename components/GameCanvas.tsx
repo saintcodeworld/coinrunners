@@ -19,6 +19,15 @@ import {
 } from '../constants';
 import { drawObstacle, drawCoin, drawDynamicChartBackground, drawPlayer } from '../utils/drawUtils';
 
+interface Projectile {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  vx: number;
+  color: string;
+}
+
 interface GameCanvasProps {
   gameState: GameState;
   setGameState: (state: GameState) => void;
@@ -45,9 +54,11 @@ const GameCanvas = memo<GameCanvasProps>(({
 
   // Skill Limits Refs
   const magnetUsedRef = useRef(false);
+  const rugInsuranceUsedRef = useRef(false); // One-time use per run
   const shieldUsedRef = useRef(false);
   const isRecoveringRef = useRef(false);
   const recoveryEndTimeRef = useRef(0);
+  const projectilesRef = useRef<Projectile[]>([]);
 
   // Keep activeRoom in a ref to avoid restarting the game loop on every update
   const activeRoomRef = useRef(activeRoom);
@@ -56,7 +67,14 @@ const GameCanvas = memo<GameCanvasProps>(({
     activeRoomRef.current = activeRoom;
   }, [activeRoom]);
 
-  const activateSkill = useCallback((skill: Skill) => {
+  const activateSkill = useCallback((skillStub: Skill, slotIndex: number) => {
+    // Rely on the passed skillStub (from fresh event) or fresh activeSkills
+    const skill = skillStub || activeSkills[slotIndex];
+    if (!skill) return;
+
+    // Passive skills check (Magnet is active, others with duration 0 are passive)
+    if (skill.durationMs === 0 && skill.type !== SkillType.MAGNET) return;
+
     const now = Date.now();
 
     // Magnet One-Time Check
@@ -73,7 +91,7 @@ const GameCanvas = memo<GameCanvasProps>(({
         cooldownEnd: 0
       };
     }
-  }, []);
+  }, [activeSkills]);
 
   // Mutable Game State
   const playerRef = useRef<Player>({
@@ -108,6 +126,7 @@ const GameCanvas = memo<GameCanvasProps>(({
     obstaclesRef.current = [];
     coinsRef.current = [];
     particlesRef.current = [];
+    projectilesRef.current = [];
     baseSpeedRef.current = GAME_SPEED_INITIAL;
     gameSpeedRef.current = GAME_SPEED_INITIAL;
     skillStateRef.current = {};
@@ -118,6 +137,7 @@ const GameCanvas = memo<GameCanvasProps>(({
     setGameSpeedDisplay(GAME_SPEED_INITIAL);
     // Reset Skill Limits on New Game
     magnetUsedRef.current = false;
+    rugInsuranceUsedRef.current = false; // Reset insurance
     shieldUsedRef.current = false;
     isRecoveringRef.current = false;
     recoveryEndTimeRef.current = 0;
@@ -139,9 +159,11 @@ const GameCanvas = memo<GameCanvasProps>(({
 
       // Reset Skills
       magnetUsedRef.current = false;
+      rugInsuranceUsedRef.current = false;
       shieldUsedRef.current = false;
       isRecoveringRef.current = false;
       recoveryEndTimeRef.current = 0;
+      projectilesRef.current = [];
       skillStateRef.current = {};
     }
     gameStateRef.current = gameState;
@@ -167,9 +189,15 @@ const GameCanvas = memo<GameCanvasProps>(({
         handleJump();
       }
 
-      activeSkills.forEach(skill => {
+      // Numeric Key Handling (1, 2, 3) for Slots
+      if (e.code === 'Digit1') activateSkill(activeSkills[0], 0);
+      if (e.code === 'Digit2') activateSkill(activeSkills[1], 1);
+      if (e.code === 'Digit3') activateSkill(activeSkills[2], 2);
+
+      // Fallback/Dev keys
+      activeSkills.forEach((skill, idx) => {
         if (skill.triggerKey && e.code === `Key${skill.triggerKey}`) {
-          activateSkill(skill);
+          activateSkill(skill, idx);
         }
       });
     };
@@ -306,10 +334,36 @@ const GameCanvas = memo<GameCanvasProps>(({
             if (skill.type === SkillType.SLOW_MOTION) speedMult = 0.5;
             if (skill.type === SkillType.MAGNET) magnetActive = true;
             if (skill.type === SkillType.INVISIBILITY) invisActive = true;
+            if (skill.type === SkillType.TO_THE_MOON) {
+              // Low Gravity Effect
+              playerRef.current.vy -= 0.4; // Counter gravity
+            }
+            if (skill.type === SkillType.LASER_EYES) {
+              // Auto-fire laser every 20 frames
+              if (frameCountRef.current % 20 === 0) {
+                projectilesRef.current.push({
+                  x: playerRef.current.x + playerRef.current.width,
+                  y: playerRef.current.y + playerRef.current.height / 2,
+                  width: 20,
+                  height: 5,
+                  vx: 15,
+                  color: '#ef4444' // Red laser
+                });
+              }
+            }
           }
           skillStateRef.current[skill.id] = state;
         }
       });
+
+      // Update Projectiles
+      for (let i = projectilesRef.current.length - 1; i >= 0; i--) {
+        const p = projectilesRef.current[i];
+        p.x += p.vx;
+        if (p.x > CANVAS_WIDTH) {
+          projectilesRef.current.splice(i, 1);
+        }
+      }
 
       gameSpeedRef.current = baseSpeedRef.current * speedMult;
 
@@ -355,13 +409,62 @@ const GameCanvas = memo<GameCanvasProps>(({
             height: obs.height
           };
 
-          if (
+          // Projectile Collision checking
+          for (let pIdx = projectilesRef.current.length - 1; pIdx >= 0; pIdx--) {
+            const proj = projectilesRef.current[pIdx];
+            if (
+              proj.x < obsRect.x + obsRect.width &&
+              proj.x + proj.width > obsRect.x &&
+              proj.y < obsRect.y + obsRect.height &&
+              proj.y + proj.height > obsRect.y
+            ) {
+              // Destroy Obstacle
+              createParticles(obs.x + obs.width / 2, obs.y + obs.height / 2, '#fff', 10);
+              obstaclesRef.current.splice(i, 1);
+              projectilesRef.current.splice(pIdx, 1);
+              continue; // Next obstacle
+            }
+          }
+
+          // Check for Whale Mode (Active Skill)
+          const whaleModeActive = activeSkills.some(s => s.type === SkillType.WHALE_MODE && skillStateRef.current[s.id]?.active);
+
+          if (whaleModeActive) {
+            // WHALE SMASH
+            if (
+              playerRect.x < obsRect.x + obsRect.width &&
+              playerRect.x + playerRect.width > obsRect.x &&
+              playerRect.y < obsRect.y + obsRect.height &&
+              playerRect.y + playerRect.height > obsRect.y
+            ) {
+              createParticles(obs.x, obs.y, '#ffffff', 15);
+              obstaclesRef.current.splice(i, 1);
+              // Small shake or feedback
+              setScore(s => s + 10); // Bonus for smashing
+              continue;
+            }
+          } else if (
             playerRect.x < obsRect.x + obsRect.width &&
             playerRect.x + playerRect.width > obsRect.x &&
             playerRect.y < obsRect.y + obsRect.height &&
             playerRect.y + playerRect.height > obsRect.y
           ) {
-            // Check for passive Shield
+            // Check for Rug Insurance (Passive)
+            const hasRugInsurance = activeSkills.some(s => s.type === SkillType.RUG_INSURANCE);
+
+            if (hasRugInsurance && !rugInsuranceUsedRef.current) {
+              // Activate Insurance
+              rugInsuranceUsedRef.current = true;
+              isRecoveringRef.current = true;
+              recoveryEndTimeRef.current = now + 4000; // 4s immunity
+              // Bounce back
+              playerRef.current.vy = -15;
+              // Visuals
+              createParticles(playerRef.current.x, playerRef.current.y, '#FFD700', 20);
+              continue;
+            }
+
+            // Check for passive Shield (Second Chance)
             const hasShield = activeSkills.some(s => s.type === SkillType.SHIELD);
 
             if (hasShield && !shieldUsedRef.current) {
@@ -414,7 +517,15 @@ const GameCanvas = memo<GameCanvasProps>(({
         if (isCollected) {
           coin.collected = true;
           // --- SCORE MULTIPLIER LOGIC ---
-          const multipliedValue = coin.value * activeRoomRef.current.multiplier;
+          let val = coin.value;
+
+          // Diamond Hands Check
+          const hasDiamondHands = activeSkills.some(s => s.type === SkillType.DIAMOND_HANDS && skillStateRef.current[s.id]?.active);
+          if (hasDiamondHands) {
+            val *= 2;
+          }
+
+          const multipliedValue = val * activeRoomRef.current.multiplier;
 
           if (coin.type === 'red') {
             createParticles(coin.x, coin.y, '#ef4444', 8); // Red particles
@@ -490,9 +601,38 @@ const GameCanvas = memo<GameCanvasProps>(({
         ctx.globalAlpha = 0.2;
       }
 
-      drawPlayer(ctx, playerRef.current, frameCountRef.current, selectedSkin);
+      // Whale Mode Scale Visual
+      let effectiveSkin = selectedSkin;
+      const whaleModeActive = activeSkills.some(s => s.type === SkillType.WHALE_MODE && skillStateRef.current[s.id]?.active);
+
+      if (whaleModeActive) {
+        effectiveSkin = {
+          ...selectedSkin,
+          bodyScale: (selectedSkin.bodyScale || 1) * 2.5,
+          headScale: (selectedSkin.headScale || 1) * 2.5,
+        };
+      }
+
+      drawPlayer(ctx, playerRef.current, frameCountRef.current, effectiveSkin);
+
+      if (whaleModeActive) {
+        // Glowing aura for Whale
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(playerRef.current.x - 10, playerRef.current.y - 10, playerRef.current.width + 20, playerRef.current.height + 20);
+        ctx.shadowBlur = 0;
+      }
+
       ctx.globalAlpha = 1.0;
     }
+
+    // Projectiles
+    ctx.fillStyle = '#ef4444';
+    projectilesRef.current.forEach(p => {
+      ctx.fillRect(p.x, p.y, p.width, p.height);
+    });
 
     // Particles
     particlesRef.current.forEach(p => {
@@ -530,22 +670,36 @@ const GameCanvas = memo<GameCanvasProps>(({
         ctx.fillStyle = '#22c55e';
         ctx.fillRect(x, hudY + 36, 40 * pct, 4);
       } else if (now < state.cooldownEnd) {
-        // Cooldown overlay
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        // Cooldown overlay - ANIMATED
+        const cooldownRemaining = state.cooldownEnd - now;
+        const totalCooldown = skill.cooldownMs;
+        const p = Math.max(0, cooldownRemaining / totalCooldown); // 1.0 to 0.0
+
+        // Darken full box
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(x, hudY, 40, 40);
+
+        // Fill from bottom - "Recharging"
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(x, hudY + 40 - (40 * p), 40, 40 * p);
 
         // Timer text
         ctx.fillStyle = 'white';
-        ctx.font = '8px "Press Start 2P"';
+        ctx.font = '10px "Press Start 2P"';
         ctx.textAlign = 'center';
-        ctx.fillText(Math.ceil((state.cooldownEnd - now) / 1000).toString(), x + 20, hudY + 25);
+        ctx.fillText(Math.ceil(cooldownRemaining / 1000).toString(), x + 20, hudY + 25);
       }
 
-      // Trigger Key
-      ctx.fillStyle = 'white';
-      ctx.font = '10px "Press Start 2P"';
-      ctx.textAlign = 'right';
-      ctx.fillText(skill.triggerKey || '', x + 38, hudY + 12);
+      // Slot Number Badge (1, 2, 3)
+      ctx.fillStyle = '#f59e0b'; // Amber
+      ctx.fillRect(x - 5, hudY - 5, 14, 14);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText((index + 1).toString(), x + 2, hudY + 6);
+
+      // Trigger Key (Display removed as we use Slot Badge)
+      // ctx.fillText(skill.triggerKey || '', x + 38, hudY + 12);
 
       // Icon
       ctx.font = '20px serif';

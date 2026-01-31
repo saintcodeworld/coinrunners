@@ -13,6 +13,7 @@ const WalletManager: React.FC<WalletManagerProps> = ({ user, solPrice, onWithdra
     const [showPrivateKey, setShowPrivateKey] = useState(false);
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
     const { addToast } = useToast();
 
     // Calculate SOL equivalent
@@ -52,67 +53,98 @@ const WalletManager: React.FC<WalletManagerProps> = ({ user, solPrice, onWithdra
         }
     };
 
+    const handleCopyAddress = () => {
+        navigator.clipboard.writeText(user.publicKey).then(() => {
+            setIsCopied(true);
+            addToast('Wallet address copied!', 'success');
+            setTimeout(() => setIsCopied(false), 2000);
+        });
+    };
+
     return (
         <div className="relative z-50 w-80">
             <div className="minecraft-panel w-full">
 
-                {/* Header Info */}
-                <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-[#555]">
-                    <div>
-                        <div className="text-[10px] text-slate-800 uppercase tracking-widest font-bold">Total Earnings</div>
-                        <div className="text-2xl font-bold text-mc-green">${user.balanceUsd.toFixed(2)}</div>
+                <div className="mb-6 pb-4 border-b-2 border-slate-400">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="text-[10px] font-bold text-slate-900 uppercase tracking-widest">Dashboard</div>
+                        <button
+                            onClick={onLogout}
+                            className="text-[10px] bg-red-600 text-white px-3 py-1 hover:bg-red-500 font-bold border-2 border-black shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:shadow-none transition-all"
+                        >
+                            LOGOUT
+                        </button>
                     </div>
-                    <div className="text-right">
-                        <div className="flex items-center justify-end gap-2 mb-1">
-                            <div className="text-[10px] text-slate-800 uppercase tracking-widest font-bold">Wallet</div>
-                            <button
-                                onClick={onLogout}
-                                className="text-[10px] bg-red-800 text-white px-2 py-1 hover:bg-red-700 font-bold border-2 border-black"
-                            >
-                                LOGOUT
-                            </button>
+
+                    <div className="bg-[#b8b8b8] p-4 border-4 border-slate-500 shadow-[inset_2px_2px_0_#fff,inset_-2px_-2px_0_#888] mb-4">
+                        <div className="text-[8px] text-slate-800 uppercase font-bold mb-2">Total Earnings</div>
+                        <div className="text-3xl font-bold text-mc-green tracking-tighter drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">
+                            ${user.balanceUsd.toFixed(2)}
                         </div>
-                        <div className="text-[10px] text-slate-800 bg-[#ccc] px-2 py-1 mb-1 border-2 border-slate-600">
-                            {truncateAddress(user.publicKey)}
+                    </div>
+
+                    <div className="space-y-2">
+                        <div
+                            onClick={handleCopyAddress}
+                            className="flex items-center justify-between bg-[#ccc] p-2 border-2 border-slate-500 cursor-pointer hover:bg-[#ddd] transition-colors group relative"
+                            title="Click to copy address"
+                        >
+                            <span className="text-[8px] font-bold text-slate-700 uppercase">Wallet</span>
+                            <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-slate-900 bg-[#eee] px-2 py-0.5 border border-slate-400 font-mono group-hover:border-slate-800">
+                                    {truncateAddress(user.publicKey)}
+                                </span>
+                                <span className="text-[8px]">📋</span>
+                            </div>
+                            {isCopied && (
+                                <div className="absolute inset-0 bg-green-600 flex items-center justify-center text-[10px] font-bold text-white uppercase tracking-widest animate-pulse">
+                                    COPIED!
+                                </div>
+                            )}
                         </div>
                         {solPrice > 0 && (
-                            <span className="text-purple-700 text-[10px] block font-bold">1 SOL = ${solPrice.toFixed(2)}</span>
+                            <div className="flex items-center justify-between bg-[#dfdfff] p-2 border-2 border-purple-400">
+                                <span className="text-[8px] font-bold text-purple-700 uppercase">Sol Price</span>
+                                <span className="text-[10px] font-bold text-purple-900">
+                                    1 SOL = ${solPrice.toFixed(2)}
+                                </span>
+                            </div>
                         )}
                     </div>
                 </div>
 
                 {/* Withdraw Section */}
                 <div className="mb-6">
-                    <label className="text-slate-800 text-xs uppercase mb-1 block font-bold">Withdraw Earnings</label>
-                    <div className="flex gap-2 mb-2">
+                    <label className="text-slate-800 text-[10px] uppercase mb-2 block font-bold">Withdraw Earnings</label>
+                    <div className="flex gap-2 mb-3">
                         <div className="relative flex-1">
-                            <span className="absolute left-3 top-2.5 text-slate-500">$</span>
+                            <span className="absolute left-3 top-3 text-slate-500 font-bold">$</span>
                             <input
                                 type="number"
                                 value={withdrawAmount}
                                 onChange={(e) => setWithdrawAmount(e.target.value)}
                                 placeholder="0.00"
-                                className="w-full bg-[#eee] border-2 border-slate-600 p-2 pl-6 text-black text-sm focus:border-black outline-none"
+                                className="w-full bg-[#eee] border-2 border-slate-600 p-2.5 pl-7 text-black text-xs font-bold focus:border-black outline-none"
                             />
                         </div>
                         <button
                             onClick={handleWithdraw}
                             disabled={!canWithdraw || isProcessing}
-                            className="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3 border-2 border-black uppercase tracking-wider transition-colors shadow-[2px_2px_0_#000]"
+                            className="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-4 border-2 border-black uppercase tracking-wider transition-colors shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none"
                         >
                             {isProcessing ? '...' : 'Send'}
                         </button>
                     </div>
 
                     {/* Conversion Preview */}
-                    <div className="flex justify-between text-xs">
-                        <span className="text-slate-700">Est. Receive:</span>
-                        <span className={amountSol > 0 ? "text-purple-700 font-bold" : "text-slate-700"}>
+                    <div className="flex justify-between items-center text-[10px] bg-slate-200 p-2 border border-slate-400">
+                        <span className="text-slate-600 font-bold">Est. Receive:</span>
+                        <span className={amountSol > 0 ? "text-purple-700 font-bold" : "text-slate-600 font-bold"}>
                             {amountSol.toFixed(4)} SOL
                         </span>
                     </div>
                     {amountUsd > user.balanceUsd && (
-                        <div className="text-red-600 font-bold text-[10px] mt-1">Insufficient balance</div>
+                        <div className="text-red-600 font-bold text-[8px] mt-2">Insufficient balance</div>
                     )}
                 </div>
 

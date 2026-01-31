@@ -66,7 +66,8 @@ export interface Room {
   pairName: string | null; // Pair name like "BONK/SOL"
   liquidity: number; // Current liquidity in USD
   lastFetchError: boolean; // True if last fetch failed
-  lastAccessed: number; // Timestamp for auto-cleanup (5 min inactivity)
+  lastAccessed: number; // Timestamp for auto-cleanup
+  cleanupDuration?: number; // Optional: Minutes until inactive deletion (0 or undefined = Never)
 }
 
 // Price point for chart visualization
@@ -78,6 +79,7 @@ export interface PricePoint {
 
 // DexScreener API response types
 export interface DexScreenerPair {
+  chainId: string;
   pairAddress: string;
   baseToken: {
     address: string;
@@ -109,15 +111,15 @@ export interface SkinSettings {
   hoodieColor: string;
   pantsColor: string;
   skinColor: string;
-  accessory: 'none' | 'sunglasses' | 'hat' | 'cap' | 'headphones' | 'bandana' | 'tophat' | 'crown' | 'mask' | 'visor';
+  accessory: 'none' | 'sunglasses' | 'hat' | 'cap' | 'headphones' | 'bandana' | 'tophat' | 'crown' | 'mask' | 'visor' | 'hair';
   accessoryColor?: string;
   // Visual customization
-  model?: 'human' | 'penguin' | 'lobster' | 'robot' | 'skeleton';
+  model?: 'human' | 'penguin' | 'lobster' | 'robot' | 'skeleton' | 'dog';
   headScale?: number; // Default 1.0
   bodyScale?: number; // Default 1.0 (width multiplier)
   // Extra Cosmetics
   chain?: boolean;
-  footwear?: 'none' | 'boots' | 'sneakers' | 'flippers';
+  footwear?: 'none' | 'boots' | 'sneakers' | 'flippers' | 'shoes';
 }
 
 export enum SkillType {
@@ -127,6 +129,11 @@ export enum SkillType {
   SHIELD = 'SHIELD',
   INVISIBILITY = 'INVISIBILITY',
   MAGNET = 'MAGNET',
+  DIAMOND_HANDS = 'DIAMOND_HANDS',
+  WHALE_MODE = 'WHALE_MODE',
+  LASER_EYES = 'LASER_EYES',
+  TO_THE_MOON = 'TO_THE_MOON',
+  RUG_INSURANCE = 'RUG_INSURANCE',
 }
 
 export interface Skill {

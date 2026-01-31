@@ -35,6 +35,7 @@ interface GameUIProps {
   equipSkill: (id: string) => void;
   selectedSkinId: string;
   activeSkillIds: string[];
+  caAddress: string;
 }
 
 // Helper to format large numbers for Market Cap
@@ -245,8 +246,18 @@ const GameUI = memo<GameUIProps>(({
   equipSkin,
   equipSkill,
   selectedSkinId,
-  activeSkillIds = []
+  activeSkillIds = [],
+  caAddress
 }) => {
+  const [showCopied, setShowCopied] = useState(false);
+
+  const handleCopyCA = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!caAddress) return;
+    navigator.clipboard.writeText(caAddress);
+    setShowCopied(true);
+    setTimeout(() => setShowCopied(false), 2000);
+  };
   // Shop State
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [shopTab, setShopTab] = useState<'skins' | 'skills'>('skins');
@@ -385,24 +396,55 @@ const GameUI = memo<GameUIProps>(({
                   <WalletManager user={user} solPrice={solPrice} onWithdraw={onWithdraw} onLogout={onLogout} />
                 </div>
               )}
-              <div className="mb-4">
+              <div className="mb-4 flex flex-wrap justify-center gap-4 md:gap-6">
                 <Shuffle
-                  text="Rugs Runner"
-                  className="text-5xl md:text-6xl font-bold text-white pixel-font tracking-widest drop-shadow-lg text-shadow"
+                  text="Rugs"
+                  className="text-5xl md:text-6xl font-bold pixel-font tracking-widest drop-shadow-lg text-shadow"
+                  style={{ color: '#ff3131' }}
                   shuffleDirection="right"
-                  colorTo="white"
-                  tag="h1"
+                  tag="span"
+                  loop={true}
+                  triggerOnHover={false}
+                />
+                <Shuffle
+                  text="Runner"
+                  className="text-5xl md:text-6xl font-bold pixel-font tracking-widest drop-shadow-lg text-shadow"
+                  style={{ color: '#00bf63' }}
+                  shuffleDirection="right"
+                  tag="span"
                   loop={true}
                   triggerOnHover={false}
                 />
               </div>
-              <p className="text-lg text-slate-400 mb-2">Mine tokens in real-time • Powered by DexScreener</p>
+
+              {caAddress && (
+                <div
+                  onClick={handleCopyCA}
+                  className="group flex flex-col items-center justify-center mb-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg text-slate-400 font-bold">CA:</span>
+                    <span className="text-lg text-slate-200 font-mono tracking-wider group-hover:text-white transition-colors border-b border-transparent group-hover:border-white/50">
+                      {caAddress}
+                    </span>
+                    <span className="text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs">
+                      📋
+                    </span>
+                  </div>
+                  <div className={`text-xs text-green-400 font-bold transition-all duration-300 ${showCopied ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
+                    COPIED TO CLIPBOARD!
+                  </div>
+                </div>
+              )}
+              {!caAddress && (
+                <p className="text-lg text-slate-400 mb-2">Mine tokens in real-time • Powered by DexScreener</p>
+              )}
 
               <button
                 onClick={() => setIsShopOpen(true)}
-                className="mt-6 btn-minecraft btn-minecraft-purple px-8 py-3 font-bold tracking-wider"
+                className="mt-6 btn-minecraft btn-minecraft-gold px-8 py-3 font-bold tracking-wider"
               >
-                🛍️ ITEM SHOP
+                ITEM SHOP
               </button>
 
               <div className="mt-8 mx-auto w-64 h-2 bg-slate-700"></div>
@@ -498,11 +540,6 @@ const GameUI = memo<GameUIProps>(({
               </div>
             </div>
 
-            {/* API Info */}
-            <div className="text-center mt-16 text-slate-600 text-sm space-y-1">
-              <p>📊 Data from DexScreener API • Selects highest liquidity pair</p>
-              <p>⏱️ Updates every 10 seconds • Sensitivity: 5x</p>
-            </div>
           </div>
         )}
 
@@ -578,7 +615,7 @@ const GameUI = memo<GameUIProps>(({
 
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="text-[10px] font-mono bg-slate-950 px-1 rounded text-slate-300">
-                            {skill.triggerKey ? `Key: ${skill.triggerKey}` : 'Passive'}
+                            {skill.durationMs > 0 ? 'Active (Slot 1-3)' : 'Passive'}
                           </div>
                         </div>
                       </button>
@@ -642,11 +679,13 @@ const GameUI = memo<GameUIProps>(({
       </div>
 
       {/* FOOTER / TICKER */}
-      {gameState === GameState.PLAYING && activeRoom && (
-        <div className="absolute bottom-4 left-0 right-0 text-center opacity-50 text-xs pixel-font text-green-800">
+      {
+        gameState === GameState.PLAYING && activeRoom && (
+          <div className="absolute bottom-4 left-0 right-0 text-center opacity-50 text-xs pixel-font text-green-800">
           // LIVE :: ${activeRoom.ticker} :: ${formatMC(activeRoom.currentMarketCap)} :: BASE ${formatMC(activeRoom.initialMarketCap)} :: {activeRoom.multiplier.toFixed(2)}x //
-        </div>
-      )}
+          </div>
+        )
+      }
 
 
       {/* SHOP MODAL */}
@@ -709,7 +748,7 @@ const GameUI = memo<GameUIProps>(({
           </div>
         )
       }
-    </div>
+    </div >
   );
 });
 

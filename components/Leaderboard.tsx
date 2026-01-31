@@ -13,61 +13,23 @@ interface LeaderboardEntry {
     prize?: string;
 }
 
-// Generate random Solana-like address
-const generateRandomAddress = () => {
-    const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    let addr = '';
-    for (let i = 0; i < 44; i++) {
-        addr += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return addr;
-};
-
-// Mock data generator for wallet addresses
-const generateMockData = (count: number, minAmount: number, maxAmount: number): LeaderboardEntry[] => {
-    const entries: LeaderboardEntry[] = [];
-
-    for (let i = 0; i < count; i++) {
-        entries.push({
-            rank: i + 1,
-            walletAddress: generateRandomAddress(),
-            amount: Math.floor(Math.random() * (maxAmount - minAmount) + minAmount),
-        });
-    }
-    return entries.sort((a, b) => b.amount - a.amount).map((entry, index) => ({ ...entry, rank: index + 1 }));
-};
-
 const Leaderboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Timeframe>('Weekly');
     const [weeklyData, setWeeklyData] = useState<LeaderboardEntry[]>([]);
     const [monthlyData, setMonthlyData] = useState<LeaderboardEntry[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Initial data
-        setWeeklyData(generateMockData(15, 500, 5000));
-        setMonthlyData(generateMockData(15, 2000, 20000));
+        // In a real application, fetch data from your backend here.
+        // For now, we initialize with empty data to ensure no "bots" are shown.
 
-        // Simulate live updates
-        const interval = setInterval(() => {
-            // Randomly update one entry to simulate live changes
-            if (Math.random() > 0.5) {
-                setWeeklyData(prev => {
-                    const newData = [...prev];
-                    const idx = Math.floor(Math.random() * newData.length);
-                    newData[idx] = { ...newData[idx], amount: newData[idx].amount + Math.floor(Math.random() * 50) };
-                    return newData.sort((a, b) => b.amount - a.amount).map((item, i) => ({ ...item, rank: i + 1 }));
-                });
-            } else {
-                setMonthlyData(prev => {
-                    const newData = [...prev];
-                    const idx = Math.floor(Math.random() * newData.length);
-                    newData[idx] = { ...newData[idx], amount: newData[idx].amount + Math.floor(Math.random() * 100) };
-                    return newData.sort((a, b) => b.amount - a.amount).map((item, i) => ({ ...item, rank: i + 1 }));
-                });
-            }
-        }, 2000);
+        // Simulating API latency then showing empty/real state
+        setTimeout(() => {
+            setWeeklyData([]);
+            setMonthlyData([]);
+            setIsLoading(false);
+        }, 1000);
 
-        return () => clearInterval(interval);
     }, []);
 
     const getPrizes = (rank: number, type: Timeframe): string | null => {
@@ -92,103 +54,111 @@ const Leaderboard: React.FC = () => {
 
     return (
         // Replaced dark theme with customized light/white theme
-        <div className="hidden lg:block w-[400px] bg-white border-4 border-white shadow-2xl relative" style={{ borderColor: '#fff #555 #555 #fff', borderWidth: '4px', borderStyle: 'solid' }}>
+        <div className="hidden lg:block w-[400px] bg-black border-4 shadow-2xl relative" style={{ borderColor: '#333 #111 #111 #333', borderStyle: 'solid' }}>
 
-            {/* Header - White Theme */}
-            <div className="bg-slate-50 p-3 border-b-2 border-slate-200 flex justify-between items-center">
+            {/* Header - Dark Theme */}
+            <div className="bg-[#111] p-3 border-b-2 border-[#222] flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <span className="text-yellow-500 text-[1.25rem] drop-shadow-sm">🏆</span>
-                    <div className="font-bold text-slate-800 pixel-font tracking-wide text-lg" style={NO_SHADOW_STYLE}>TOP RUNNERS</div>
+                    <span className="text-yellow-500 text-[1.25rem] drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]">🏆</span>
+                    <div className="font-bold text-white pixel-font tracking-wide text-lg" style={NO_SHADOW_STYLE}>TOP RUNNERS</div>
                 </div>
                 <div className="flex gap-2">
                     <button
                         onClick={() => setActiveTab('Weekly')}
-                        className={`px-3 py-1 text-xs font-bold border-2 transition-all rounded shadow-sm ${activeTab === 'Weekly' ? 'bg-purple-600 border-purple-800 text-white' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+                        className={`px-3 py-1 text-xs font-bold border-2 transition-all rounded shadow-sm ${activeTab === 'Weekly' ? 'text-white' : 'bg-black border-[#444] text-slate-400 hover:bg-[#222] hover:text-white'}`}
+                        style={activeTab === 'Weekly' ? { backgroundColor: '#00bf63', borderColor: '#00a054' } : {}}
                     >
                         Weekly
                     </button>
                     <button
                         onClick={() => setActiveTab('Monthly')}
-                        className={`px-3 py-1 text-xs font-bold border-2 transition-all rounded shadow-sm ${activeTab === 'Monthly' ? 'bg-purple-600 border-purple-800 text-white' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+                        className={`px-3 py-1 text-xs font-bold border-2 transition-all rounded shadow-sm ${activeTab === 'Monthly' ? 'text-white' : 'bg-black border-[#444] text-slate-400 hover:bg-[#222] hover:text-white'}`}
+                        style={activeTab === 'Monthly' ? { backgroundColor: '#00bf63', borderColor: '#00a054' } : {}}
                     >
                         Monthly
                     </button>
                 </div>
             </div>
 
-            {/* Prize Pool Banner - Lighter */}
-            <div className="bg-gradient-to-r from-purple-100 to-blue-100 p-2 text-center border-b-2 border-slate-200">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">
+            {/* Prize Pool Banner - Dark */}
+            <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] p-2 text-center border-b-2 border-[#222]">
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">
                     {activeTab} Giveaway Pool
                 </p>
-                <div className="text-[1.5rem] font-bold text-slate-800 pixel-font" style={NO_SHADOW_STYLE}>
+                <div className="text-[1.5rem] font-bold pixel-font" style={{ ...NO_SHADOW_STYLE, color: '#00bf63' }}>
                     {poolSize}
                 </div>
             </div>
 
-            {/* List - Reduced Height (approx half) & White Bkg */}
-            <div className="max-h-[220px] overflow-y-auto custom-scrollbar-light bg-white">
-                <table className="w-full text-sm text-left border-collapse">
-                    <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 uppercase sticky top-0 z-10 font-bold">
-                        <tr>
-                            <th className="px-4 py-2 text-center">#</th>
-                            <th className="px-4 py-2">Wallet</th>
-                            <th className="px-4 py-2 text-right">Score</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {data.map((entry) => {
-                            const prize = getPrizes(entry.rank, activeTab);
-                            let rowClass = "hover:bg-slate-50 transition-colors";
+            {/* List - Reduced Height (approx half) & Black Bkg */}
+            <div className="max-h-[220px] overflow-y-auto custom-scrollbar bg-black min-h-[100px]">
+                {isLoading ? (
+                    <div className="flex justify-center items-center h-full py-8 text-slate-500 text-xs font-bold animate-pulse">
+                        Loading Data...
+                    </div>
+                ) : data.length === 0 ? (
+                    <div className="flex flex-col justify-center items-center h-full py-8 text-slate-500 text-xs font-bold">
+                        <span className="text-2xl mb-2 opacity-30 grayscale pointer-events-none">🕸️</span>
+                        No runners yet
+                        <span className="text-[9px] opacity-70 mt-1 font-medium">Be the first!</span>
+                    </div>
+                ) : (
+                    <table className="w-full text-sm text-left border-collapse">
+                        <thead className="text-xs text-slate-400 bg-[#0a0a0a] border-b border-[#222] uppercase sticky top-0 z-10 font-bold">
+                            <tr>
+                                <th className="px-4 py-2 text-center">#</th>
+                                <th className="px-4 py-2">Wallet</th>
+                                <th className="px-4 py-2 text-right">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#111]">
+                            {data.map((entry) => {
+                                const prize = getPrizes(entry.rank, activeTab);
+                                let rowClass = "hover:bg-[#0a0a0a] transition-colors";
 
-                            // Medal styling
-                            let rankDisplay: React.ReactNode = <span className="text-slate-400 font-mono font-bold">{entry.rank}</span>;
-                            let rankSize = "text-base";
+                                // Medal styling
+                                let rankDisplay: React.ReactNode = <span className="text-slate-500 font-mono font-bold">{entry.rank}</span>;
+                                let rankSize = "text-base";
 
-                            if (entry.rank === 1) {
-                                rowClass = "bg-yellow-50 hover:bg-yellow-100";
-                                rankDisplay = <span className="text-[1.25rem]">🥇</span>;
-                            } else if (entry.rank === 2) {
-                                rowClass = "bg-slate-100 hover:bg-slate-200";
-                                rankDisplay = <span className="text-[1.25rem]">🥈</span>;
-                            } else if (entry.rank === 3) {
-                                rowClass = "bg-orange-50 hover:bg-orange-100";
-                                rankDisplay = <span className="text-[1.25rem]">🥉</span>;
-                            }
+                                if (entry.rank === 1) {
+                                    rowClass = "bg-[#1a1a00] hover:bg-[#2a2a00]";
+                                    rankDisplay = <span className="text-[1.25rem] drop-shadow-[0_0_5px_rgba(234,179,8,0.5)]">🥇</span>;
+                                } else if (entry.rank === 2) {
+                                    rowClass = "bg-[#0f172a] hover:bg-[#1e293b]";
+                                    rankDisplay = <span className="text-[1.25rem] drop-shadow-[0_0_5px_rgba(148,163,184,0.5)]">🥈</span>;
+                                } else if (entry.rank === 3) {
+                                    rowClass = "bg-[#1c1917] hover:bg-[#292524]";
+                                    rankDisplay = <span className="text-[1.25rem] drop-shadow-[0_0_5px_rgba(249,115,22,0.5)]">🥉</span>;
+                                }
 
-                            return (
-                                <tr key={entry.rank} className={rowClass}>
-                                    <td className={`px-4 py-2 text-center font-bold ${rankSize}`}>
-                                        {rankDisplay}
-                                    </td>
-                                    <td className="px-4 py-2">
-                                        <div className="font-bold text-slate-800 font-mono tracking-tight text-xs">
-                                            {truncateAddress(entry.walletAddress)}
-                                        </div>
-                                        {prize && (
-                                            <div className="text-[10px] text-purple-600 font-mono leading-none mt-1 font-bold">
-                                                🎁 {prize}
+                                return (
+                                    <tr key={entry.rank} className={rowClass}>
+                                        <td className={`px-4 py-2 text-center font-bold ${rankSize}`}>
+                                            {rankDisplay}
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <div className="font-bold text-slate-200 font-mono tracking-tight text-xs">
+                                                {truncateAddress(entry.walletAddress)}
                                             </div>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-2 text-right">
-                                        <div className="font-mono text-green-600 font-bold text-xs">
-                                            ${entry.amount.toLocaleString()}
-                                        </div>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                                            {prize && (
+                                                <div className="text-[10px] font-mono leading-none mt-1 font-bold" style={{ color: '#00bf63' }}>
+                                                    🎁 {prize}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2 text-right">
+                                            <div className="font-mono text-green-400 font-bold text-xs">
+                                                ${entry.amount.toLocaleString()}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
-            {/* Footer info - Lighter */}
-            <div className="p-2 bg-slate-50 text-center border-t-2 border-slate-200">
-                <p className="text-[10px] text-slate-400 font-bold">
-                    ~ Leaderboard does not reset on withdraw ~
-                </p>
-            </div>
         </div>
     );
 };
