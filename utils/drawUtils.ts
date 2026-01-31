@@ -10,7 +10,7 @@ const drawPixelRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: n
 };
 
 export const drawPlayer = (ctx: CanvasRenderingContext2D, player: Player, frameTick: number, skin?: SkinSettings) => {
-  const { x, y, width, height } = player;
+  const { x, y } = player;
 
   // Default fallback if no skin provided
   const s = skin || {
@@ -19,10 +19,13 @@ export const drawPlayer = (ctx: CanvasRenderingContext2D, player: Player, frameT
     hoodieColor: player.color, // Fallback to player.color
     pantsColor: '#1e293b',
     skinColor: '#fca5a5',
-    accessory: 'sunglasses' as const
+    accessory: 'sunglasses' as const,
+    model: 'human',
+    headScale: 1,
+    bodyScale: 1
   };
 
-  const { hoodieColor, pantsColor, skinColor, accessory, accessoryColor } = s;
+  const { hoodieColor, pantsColor, skinColor, accessory, accessoryColor, model = 'human', headScale = 1, bodyScale = 1, chain = false, footwear = 'none' } = s;
   const accColor = accessoryColor || '#000000';
 
   ctx.save();
@@ -31,92 +34,231 @@ export const drawPlayer = (ctx: CanvasRenderingContext2D, player: Player, frameT
   const bounce = player.isJumping ? 0 : (Math.sin(frameTick * 0.2) * 2);
   const drawY = y + bounce;
 
-  // Legs
-  if (player.isJumping) {
-    drawPixelRect(ctx, x + 10, drawY + 25, 8, 10, pantsColor);
-    drawPixelRect(ctx, x + 22, drawY + 20, 8, 10, pantsColor);
+  // Helper for footwear
+  const drawFootwear = (fx: number, fy: number, fw: number, fh: number) => {
+    if (footwear === 'none') return;
+
+    if (footwear === 'boots') {
+      drawPixelRect(ctx, fx - 1, fy + fh - 6, fw + 2, 8, '#1e293b'); // Dark boot
+      drawPixelRect(ctx, fx - 1, fy + fh - 2, fw + 2, 2, '#0f172a'); // Sole
+    } else if (footwear === 'sneakers') {
+      drawPixelRect(ctx, fx - 1, fy + fh - 5, fw + 2, 6, '#ea580c'); // Bright orange
+      drawPixelRect(ctx, fx, fy + fh - 5, 2, 2, 'white'); // Lace
+      drawPixelRect(ctx, fx - 1, fy + fh - 2, fw + 2, 2, 'white'); // Sole
+    } else if (footwear === 'flippers') {
+      drawPixelRect(ctx, fx - 4, fy + fh - 2, fw + 8, 3, '#0ea5e9'); // Blue flipper
+    }
+  };
+
+  if (model === 'penguin') {
+    // === PENGUIN MODEL ===
+    const bellyColor = 'white';
+
+    // Body (Roundish)
+    drawPixelRect(ctx, x + 10, drawY + 15, 20, 25, hoodieColor); // Main body
+    drawPixelRect(ctx, x + 14, drawY + 18, 12, 22, bellyColor); // Belly
+
+    // Head (Connected to body)
+    drawPixelRect(ctx, x + 10, drawY + 5, 20, 15, hoodieColor);
+
+    // Eyes
+    drawPixelRect(ctx, x + 14, drawY + 8, 4, 4, 'white');
+    drawPixelRect(ctx, x + 22, drawY + 8, 4, 4, 'white');
+    drawPixelRect(ctx, x + 15, drawY + 9, 2, 2, 'black');
+    drawPixelRect(ctx, x + 23, drawY + 9, 2, 2, 'black');
+
+    // Beak
+    drawPixelRect(ctx, x + 18, drawY + 12, 6, 3, '#f97316');
+
+    // Feet
+    if (player.isJumping) {
+      drawPixelRect(ctx, x + 10, drawY + 38, 8, 4, '#f97316');
+      drawPixelRect(ctx, x + 22, drawY + 38, 8, 4, '#f97316');
+    } else {
+      const legPhase = Math.sin(frameTick * 0.5);
+      drawPixelRect(ctx, x + 10, drawY + 38 + (legPhase * 2), 8, 4, '#f97316');
+      drawPixelRect(ctx, x + 22, drawY + 38 - (legPhase * 2), 8, 4, '#f97316');
+    }
+
+    // Flippers
+    if (player.isJumping) {
+      // Flapping
+      const flap = Math.sin(frameTick * 0.8) * 5;
+      drawPixelRect(ctx, x + 2, drawY + 15 + flap, 8, 12, hoodieColor);
+      drawPixelRect(ctx, x + 30, drawY + 15 + flap, 8, 12, hoodieColor);
+    } else {
+      drawPixelRect(ctx, x + 4, drawY + 18, 6, 12, hoodieColor);
+      drawPixelRect(ctx, x + 30, drawY + 18, 6, 12, hoodieColor);
+    }
+
+    // Minimal accessories support for Penguin (Hat only usually fits)
+    if (accessory === 'hat') {
+      drawPixelRect(ctx, x + 8, drawY - 2, 24, 6, accColor); // Brim
+      drawPixelRect(ctx, x + 12, drawY - 10, 16, 8, accColor); // Top
+    }
+
+  } else if (model === 'lobster') {
+    // === LOBSTER MODEL ===
+    const shellColor = hoodieColor; // Usually red
+    const secondaryColor = pantsColor; // Darker red
+
+    // Tail (Curled)
+    drawPixelRect(ctx, x + 5, drawY + 20, 12, 10, secondaryColor); // Left tail part
+    drawPixelRect(ctx, x + 23, drawY + 20, 12, 10, secondaryColor); // Right tail part
+    drawPixelRect(ctx, x + 15, drawY + 25, 10, 15, secondaryColor); // Center tail
+
+    // Body (Carapace)
+    drawPixelRect(ctx, x + 10, drawY + 8, 20, 18, shellColor);
+
+    // Head Area
+    drawPixelRect(ctx, x + 15, drawY + 2, 10, 8, shellColor);
+
+    // Eyes (Stalks)
+    drawPixelRect(ctx, x + 14, drawY - 4, 3, 6, shellColor);
+    drawPixelRect(ctx, x + 23, drawY - 4, 3, 6, shellColor);
+    drawPixelRect(ctx, x + 14, drawY - 5, 3, 3, 'black');
+    drawPixelRect(ctx, x + 23, drawY - 5, 3, 3, 'black');
+
+    // Claws
+    const armY = drawY + 10;
+    if (player.isJumping) {
+      // Snip snip
+      const snip = Math.abs(Math.sin(frameTick * 0.5)) * 3;
+      // Left Claw
+      drawPixelRect(ctx, x - 2, armY - 10, 10, 15, shellColor);
+      drawPixelRect(ctx, x - 2, armY - 15 - snip, 4, 8, shellColor);
+      drawPixelRect(ctx, x + 4, armY - 15 + snip, 4, 8, shellColor);
+
+      // Right Claw
+      drawPixelRect(ctx, x + 32, armY - 10, 10, 15, shellColor);
+      drawPixelRect(ctx, x + 32, armY - 15 + snip, 4, 8, shellColor);
+      drawPixelRect(ctx, x + 38, armY - 15 - snip, 4, 8, shellColor);
+    } else {
+      // Idle claws
+      const bob = Math.sin(frameTick * 0.2) * 2;
+      drawPixelRect(ctx, x - 2, armY + bob, 10, 12, shellColor);
+      drawPixelRect(ctx, x + 32, armY + bob, 10, 12, shellColor);
+    }
+
+    // Legs
+    drawPixelRect(ctx, x + 8, drawY + 30, 4, 8, secondaryColor);
+    drawPixelRect(ctx, x + 18, drawY + 30, 4, 8, secondaryColor);
+    drawPixelRect(ctx, x + 28, drawY + 30, 4, 8, secondaryColor);
+
   } else {
-    const legPhase = Math.sin(frameTick * 0.5);
-    drawPixelRect(ctx, x + 10, drawY + 25 + (legPhase * 5), 8, 15, pantsColor);
-    drawPixelRect(ctx, x + 22, drawY + 25 - (legPhase * 5), 8, 15, pantsColor);
-  }
+    // === HUMAN / STANDARD MODEL ===
 
-  // Body
-  drawPixelRect(ctx, x + 5, drawY + 10, 30, 20, hoodieColor);
+    // Legs
+    if (player.isJumping) {
+      drawPixelRect(ctx, x + 10, drawY + 25, 8, 10, pantsColor);
+      drawPixelRect(ctx, x + 22, drawY + 20, 8, 10, pantsColor);
+      drawFootwear(x + 10, drawY + 25, 8, 10);
+      drawFootwear(x + 22, drawY + 20, 8, 10);
+    } else {
+      const legPhase = Math.sin(frameTick * 0.5);
+      drawPixelRect(ctx, x + 10, drawY + 25 + (legPhase * 5), 8, 15, pantsColor);
+      drawPixelRect(ctx, x + 22, drawY + 25 - (legPhase * 5), 8, 15, pantsColor);
+      drawFootwear(x + 10, drawY + 25 + (legPhase * 5), 8, 15);
+      drawFootwear(x + 22, drawY + 25 - (legPhase * 5), 8, 15);
+    }
 
-  // Head
-  drawPixelRect(ctx, x + 8, drawY - 5, 24, 15, skinColor);
+    // Body
+    const bw = 30 * bodyScale;
+    const bx = x + (40 - bw) / 2;
+    drawPixelRect(ctx, bx, drawY + 10, bw, 20, hoodieColor);
 
-  // Accessories
-  if (accessory === 'sunglasses') {
-    drawPixelRect(ctx, x + 18, drawY - 2, 16, 6, 'black');
-    drawPixelRect(ctx, x + 20, drawY - 1, 3, 2, 'white');
-    drawPixelRect(ctx, x + 28, drawY - 1, 2, 2, 'white');
-  } else if (accessory === 'hat') {
-    drawPixelRect(ctx, x + 6, drawY - 10, 28, 6, accColor); // Brim
-    drawPixelRect(ctx, x + 10, drawY - 18, 20, 8, accColor); // Top
-    // Eyes
-    drawPixelRect(ctx, x + 22, drawY - 2, 4, 4, 'black');
-    drawPixelRect(ctx, x + 28, drawY - 2, 4, 4, 'black');
-  } else if (accessory === 'cap') {
-    drawPixelRect(ctx, x + 6, drawY - 10, 26, 6, accColor);
-    drawPixelRect(ctx, x + 20, drawY - 10, 14, 4, accColor); // Bill
-    // Eyes
-    drawPixelRect(ctx, x + 22, drawY - 2, 4, 4, 'black');
-    drawPixelRect(ctx, x + 28, drawY - 2, 4, 4, 'black');
-  } else if (accessory === 'headphones') {
-    // Band
-    drawPixelRect(ctx, x + 6, drawY - 8, 28, 4, accColor);
-    // Muffs
-    drawPixelRect(ctx, x + 4, drawY - 2, 6, 12, accColor);
-    drawPixelRect(ctx, x + 30, drawY - 2, 6, 12, accColor);
-    // Eyes
-    drawPixelRect(ctx, x + 18, drawY - 2, 4, 4, 'black');
-    drawPixelRect(ctx, x + 26, drawY - 2, 4, 4, 'black');
-  } else if (accessory === 'bandana') {
-    // Eyes
-    drawPixelRect(ctx, x + 18, drawY - 4, 4, 4, 'black');
-    drawPixelRect(ctx, x + 26, drawY - 4, 4, 4, 'black');
-    // Bandana
-    drawPixelRect(ctx, x + 8, drawY + 2, 24, 10, accColor);
-  } else if (accessory === 'tophat') {
-    drawPixelRect(ctx, x + 6, drawY - 8, 28, 4, 'black'); // Brim
-    drawPixelRect(ctx, x + 10, drawY - 20, 20, 12, 'black'); // Top
-    drawPixelRect(ctx, x + 10, drawY - 12, 20, 4, accColor); // Ribbon
-    // Eyes and monocle
-    drawPixelRect(ctx, x + 18, drawY - 2, 4, 4, 'black');
-    drawPixelRect(ctx, x + 26, drawY - 2, 4, 4, 'black');
-    ctx.strokeStyle = 'gold'; ctx.lineWidth = 1; ctx.strokeRect(x + 25, drawY - 3, 6, 6); // Monocle
-  } else if (accessory === 'crown') {
-    drawPixelRect(ctx, x + 6, drawY - 12, 28, 8, 'gold');
-    drawPixelRect(ctx, x + 6, drawY - 16, 6, 4, 'gold');
-    drawPixelRect(ctx, x + 17, drawY - 16, 6, 4, 'gold');
-    drawPixelRect(ctx, x + 28, drawY - 16, 6, 4, 'gold');
-    // Eyes
-    drawPixelRect(ctx, x + 18, drawY - 2, 4, 4, 'black');
-    drawPixelRect(ctx, x + 26, drawY - 2, 4, 4, 'black');
-  } else if (accessory === 'mask') {
-    drawPixelRect(ctx, x + 8, drawY - 5, 24, 15, accColor); // Full mask
-    drawPixelRect(ctx, x + 12, drawY - 2, 6, 4, 'white'); // Eye holes
-    drawPixelRect(ctx, x + 22, drawY - 2, 6, 4, 'white');
-  } else if (accessory === 'visor') {
-    drawPixelRect(ctx, x + 10, drawY - 4, 20, 6, accColor);
-    // Glow
-    ctx.shadowColor = accColor; ctx.shadowBlur = 5;
-    ctx.fillStyle = 'white'; ctx.fillRect(x + 15, drawY - 3, 10, 2);
-    ctx.shadowBlur = 0;
-  } else {
-    // None/Default eyes
-    drawPixelRect(ctx, x + 22, drawY - 2, 4, 4, 'black');
-    drawPixelRect(ctx, x + 28, drawY - 2, 4, 4, 'black');
-  }
+    // Chain (Gold)
+    if (chain) {
+      drawPixelRect(ctx, bx + bw / 2 - 6, drawY + 12, 12, 8, '#fcd34d'); // Gold chain loop
+      drawPixelRect(ctx, bx + bw / 2 - 4, drawY + 14, 8, 4, hoodieColor); // Inner hole
+      drawPixelRect(ctx, bx + bw / 2 - 2, drawY + 18, 4, 4, '#fcd34d'); // Pendant
+    }
 
-  // Arm
-  if (!player.isJumping) {
-    const armPhase = Math.cos(frameTick * 0.5);
-    drawPixelRect(ctx, x + 12 + (armPhase * 5), drawY + 15, 8, 12, hoodieColor);
-  } else {
-    drawPixelRect(ctx, x + 25, drawY + 8, 8, 12, hoodieColor);
+    // Head
+    const hw = 24 * headScale;
+    const hh = 15 * headScale;
+    const hx = x + (40 - hw) / 2;
+    const hy = drawY - 5 - (hh - 15); // Grow upwards
+    drawPixelRect(ctx, hx, hy, hw, hh, skinColor);
+
+    // === ACCESSORIES ===
+    // Note: Accessories are hardcoded for standard size. 
+    // We'll apply a simple offset check or just draw them relative to center.
+    // For simplicity, we mostly stick to standard coordinates but shifted if head is moved.
+
+    const cx = x + 20; // Center X
+
+    if (accessory === 'sunglasses') {
+      const glassesWidth = 16 * headScale;
+      drawPixelRect(ctx, cx - glassesWidth / 2 + 2, hy + 3 * headScale, glassesWidth, 6 * headScale, 'black');
+      drawPixelRect(ctx, cx - glassesWidth / 2 + 4, hy + 4 * headScale, 3 * headScale, 2 * headScale, 'white');
+      drawPixelRect(ctx, cx + 2, hy + 4 * headScale, 2 * headScale, 2 * headScale, 'white');
+    } else if (accessory === 'hat') {
+      drawPixelRect(ctx, cx - 14 * headScale, hy - 5, 28 * headScale, 6 * headScale, accColor); // Brim
+      drawPixelRect(ctx, cx - 10 * headScale, hy - 13, 20 * headScale, 8 * headScale, accColor); // Top
+      // Eyes
+      drawPixelRect(ctx, cx + 2, hy + 3 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 8, hy + 3 * headScale, 4, 4, 'black');
+    } else if (accessory === 'cap') {
+      drawPixelRect(ctx, cx - 14 * headScale, hy - 5, 26 * headScale, 6 * headScale, accColor);
+      drawPixelRect(ctx, cx, hy - 5, 14 * headScale, 4 * headScale, accColor); // Bill
+      // Eyes
+      drawPixelRect(ctx, cx + 2, hy + 3 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 8, hy + 3 * headScale, 4, 4, 'black');
+    } else if (accessory === 'headphones') {
+      // Band
+      drawPixelRect(ctx, cx - 14 * headScale, hy - 3, 28 * headScale, 4 * headScale, accColor);
+      // Muffs
+      drawPixelRect(ctx, cx - 16 * headScale, hy + 3, 6 * headScale, 12 * headScale, accColor);
+      drawPixelRect(ctx, cx + 10 * headScale, hy + 3, 6 * headScale, 12 * headScale, accColor);
+      // Eyes
+      drawPixelRect(ctx, cx - 2, hy + 3 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 6, hy + 3 * headScale, 4, 4, 'black');
+    } else if (accessory === 'bandana') {
+      // Eyes
+      drawPixelRect(ctx, cx - 2, hy + 1 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 6, hy + 1 * headScale, 4, 4, 'black');
+      // Bandana
+      drawPixelRect(ctx, cx - 12 * headScale, hy + 7 * headScale, 24 * headScale, 10 * headScale, accColor);
+    } else if (accessory === 'tophat') {
+      drawPixelRect(ctx, cx - 14 * headScale, hy - 3, 28 * headScale, 4 * headScale, 'black'); // Brim
+      drawPixelRect(ctx, cx - 10 * headScale, hy - 15, 20 * headScale, 12 * headScale, 'black'); // Top
+      drawPixelRect(ctx, cx - 10 * headScale, hy - 7, 20 * headScale, 4 * headScale, accColor); // Ribbon
+      // Eyes and monocle
+      drawPixelRect(ctx, cx - 2, hy + 3 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 6, hy + 3 * headScale, 4, 4, 'black');
+      ctx.strokeStyle = 'gold'; ctx.lineWidth = 1; ctx.strokeRect(cx + 5, hy + 2 * headScale, 6 * headScale, 6 * headScale); // Monocle
+    } else if (accessory === 'crown') {
+      drawPixelRect(ctx, cx - 14 * headScale, hy - 7, 28 * headScale, 8 * headScale, 'gold');
+      drawPixelRect(ctx, cx - 14 * headScale, hy - 11, 6 * headScale, 4 * headScale, 'gold');
+      drawPixelRect(ctx, cx - 3 * headScale, hy - 11, 6 * headScale, 4 * headScale, 'gold');
+      drawPixelRect(ctx, cx + 8 * headScale, hy - 11, 6 * headScale, 4 * headScale, 'gold');
+      // Eyes
+      drawPixelRect(ctx, cx - 2, hy + 3 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 6, hy + 3 * headScale, 4, 4, 'black');
+    } else if (accessory === 'mask') {
+      drawPixelRect(ctx, hx, hy, hw, hh, accColor); // Full mask over face area
+      drawPixelRect(ctx, cx - 8, hy + 3, 6, 4, 'white'); // Eye holes
+      drawPixelRect(ctx, cx + 2, hy + 3, 6, 4, 'white');
+    } else if (accessory === 'visor') {
+      drawPixelRect(ctx, cx - 10 * headScale, hy + 1, 20 * headScale, 6 * headScale, accColor);
+      // Glow
+      ctx.shadowColor = accColor; ctx.shadowBlur = 5;
+      ctx.fillStyle = 'white'; ctx.fillRect(cx - 5, hy + 2, 10, 2);
+      ctx.shadowBlur = 0;
+    } else {
+      // None/Default eyes
+      drawPixelRect(ctx, cx + 2, hy + 3 * headScale, 4, 4, 'black');
+      drawPixelRect(ctx, cx + 8, hy + 3 * headScale, 4, 4, 'black');
+    }
+
+    // Arm
+    if (!player.isJumping) {
+      const armPhase = Math.cos(frameTick * 0.5);
+      drawPixelRect(ctx, x + 12 + (armPhase * 5), drawY + 15, 8, 12, hoodieColor);
+    } else {
+      drawPixelRect(ctx, x + 25, drawY + 8, 8, 12, hoodieColor);
+    }
   }
 
   ctx.restore();
@@ -159,7 +301,7 @@ export const drawObstacle = (ctx: CanvasRenderingContext2D, obs: Obstacle, frame
     ctx.fillText('!', obs.x + obs.width / 2, obs.y + obs.height / 2);
 
     ctx.fillStyle = '#60a5fa';
-    ctx.font = '10px VT323';
+    ctx.font = '10px "Press Start 2P"';
     ctx.textAlign = 'center';
     ctx.fillText('SCAM', obs.x + obs.width / 2, obs.y - 5);
 
@@ -200,37 +342,65 @@ export const drawCoin = (ctx: CanvasRenderingContext2D, coin: Coin, frameTick: n
 
   ctx.save();
 
-  const gradient = ctx.createLinearGradient(coin.x, coin.y, coin.x + coin.width, coin.y + coin.height);
-  gradient.addColorStop(0, '#9945FF');
-  gradient.addColorStop(1, '#14F195');
+  if (coin.type === 'red') {
+    // Red Coin Visuals (Bad)
+    const gradient = ctx.createLinearGradient(coin.x, coin.y, coin.x + coin.width, coin.y + coin.height);
+    gradient.addColorStop(0, '#ef4444');
+    gradient.addColorStop(1, '#991b1b');
 
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = '#14F195';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ef4444';
 
-  ctx.beginPath();
-  ctx.arc(centerX, finalY, radius, 0, Math.PI * 2);
-  ctx.fillStyle = gradient;
-  ctx.fill();
+    ctx.beginPath();
+    ctx.arc(centerX, finalY, radius, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
 
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+    ctx.strokeStyle = '#fca5a5';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
+    // "-" symbol on coin
+    ctx.beginPath();
+    ctx.moveTo(centerX - 5, finalY);
+    ctx.lineTo(centerX + 5, finalY);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  } else {
+    // Green/Standard Coin Visuals (Good)
+    const gradient = ctx.createLinearGradient(coin.x, coin.y, coin.x + coin.width, coin.y + coin.height);
+    gradient.addColorStop(0, '#9945FF');
+    gradient.addColorStop(1, '#14F195');
 
-  const w = radius * 0.6;
-  const h = radius * 0.6;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#14F195';
 
-  ctx.beginPath();
-  ctx.moveTo(centerX - w + 2, finalY - h / 2);
-  ctx.lineTo(centerX + w - 2, finalY - h / 2 - 2);
-  ctx.moveTo(centerX - w + 2, finalY);
-  ctx.lineTo(centerX + w - 2, finalY - 2);
-  ctx.moveTo(centerX - w + 2, finalY + h / 2);
-  ctx.lineTo(centerX + w - 2, finalY + h / 2 - 2);
-  ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(centerX, finalY, radius, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    const w = radius * 0.6;
+    const h = radius * 0.6;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX - w + 2, finalY - h / 2);
+    ctx.lineTo(centerX + w - 2, finalY - h / 2 - 2);
+    ctx.moveTo(centerX - w + 2, finalY);
+    ctx.lineTo(centerX + w - 2, finalY - 2);
+    ctx.moveTo(centerX - w + 2, finalY + h / 2);
+    ctx.lineTo(centerX + w - 2, finalY + h / 2 - 2);
+    ctx.stroke();
+  }
 
   ctx.restore();
 };
@@ -250,8 +420,9 @@ export const drawDynamicChartBackground = (
   currentMarketCap: number
 ) => {
   // Dark Grid Background
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#121212';
 
+  // Basic Grid
   ctx.strokeStyle = '#1e293b';
   ctx.lineWidth = 1;
 
@@ -264,7 +435,7 @@ export const drawDynamicChartBackground = (
   }
   ctx.stroke();
 
-  // Horizontal grid lines (static)
+  // Horizontal grid lines
   ctx.beginPath();
   for (let y = 0; y < height; y += gridSize) {
     ctx.moveTo(0, y);
@@ -277,127 +448,134 @@ export const drawDynamicChartBackground = (
   // ===========================================
   ctx.save();
 
-  // Chart area (leave space for floor)
+  // Chart area
   const chartTop = 50;
   const chartBottom = height - 80;
   const chartHeight = chartBottom - chartTop;
   const centerY = chartTop + chartHeight / 2;
 
-  // Calculate the price range for scaling
-  // We want ±20% from initial to fill the visual range
-  const maxDeviation = 0.20; // 20% deviation fills the chart
+  // Price Scaling - Auto Range
+  let minCap = initialMarketCap;
+  let maxCap = initialMarketCap;
 
-  // Normalize current price to chart coordinates
-  const normalizePrice = (marketCap: number): number => {
-    if (initialMarketCap <= 0) return centerY;
-    const percentChange = (marketCap - initialMarketCap) / initialMarketCap;
-    // Clamp to ±20% visually
-    const clampedChange = Math.max(-maxDeviation, Math.min(maxDeviation, percentChange));
-    // Map to chart Y (inverted because Y grows downward)
-    return centerY - (clampedChange / maxDeviation) * (chartHeight / 2);
-  };
-
-  // Set up chart line style
-  ctx.strokeStyle = themeColor;
-  ctx.lineWidth = 3;
-  ctx.shadowColor = themeColor;
-  ctx.shadowBlur = 15;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Draw the chart line
-  ctx.beginPath();
-
-  if (priceHistory.length === 0) {
-    // No data yet - draw flat line at center with slight noise for animation
-    ctx.moveTo(0, centerY);
-    for (let x = 0; x < width; x += 5) {
-      const worldX = x + offset;
-      // Subtle animated noise while waiting for data
-      const noise = Math.sin(worldX * 0.02) * 5 + Math.cos(worldX * 0.05) * 3;
-      ctx.lineTo(x, centerY + noise);
-    }
-  } else if (priceHistory.length === 1) {
-    // Single data point - draw flat line from initial with smooth transition
-    const y = normalizePrice(priceHistory[0].marketCap);
-    ctx.moveTo(0, centerY);
-    for (let x = 0; x < width; x += 5) {
-      // Smooth transition from center to current price
-      const progress = Math.min(1, x / (width * 0.3));
-      const interpolatedY = centerY + (y - centerY) * progress;
-      // Add subtle noise for visual interest
-      const worldX = x + offset;
-      const noise = Math.sin(worldX * 0.03) * 2;
-      ctx.lineTo(x, interpolatedY + noise);
-    }
-  } else {
-    // Multiple data points - draw real price action
-    // Space out points across the width
-    const pointSpacing = width / Math.max(1, priceHistory.length - 1);
-
-    // Start from the oldest data point
-    let startY = normalizePrice(priceHistory[0].marketCap);
-    ctx.moveTo(0, startY);
-
-    // Draw smooth curve through all price points
-    for (let i = 1; i < priceHistory.length; i++) {
-      const x = i * pointSpacing;
-      const y = normalizePrice(priceHistory[i].marketCap);
-
-      // Use quadratic curve for smoothness
-      const prevX = (i - 1) * pointSpacing;
-      const prevY = normalizePrice(priceHistory[i - 1].marketCap);
-      const cpX = (prevX + x) / 2;
-
-      ctx.quadraticCurveTo(cpX, prevY, x, y);
-    }
-
-    // Extend line to edge of screen with subtle animation
-    const lastY = normalizePrice(priceHistory[priceHistory.length - 1].marketCap);
-    const lastX = (priceHistory.length - 1) * pointSpacing;
-
-    for (let x = lastX; x < width; x += 5) {
-      const worldX = x + offset;
-      // Subtle prediction/continuation noise
-      const noise = Math.sin(worldX * 0.04) * 3 + Math.cos(worldX * 0.07) * 2;
-      ctx.lineTo(x, lastY + noise);
-    }
-  }
-
-  ctx.stroke();
-
-  // Fill area under the chart
-  ctx.lineTo(width, chartBottom);
-  ctx.lineTo(0, chartBottom);
-  ctx.closePath();
-  ctx.globalAlpha = 0.1;
-  ctx.fillStyle = themeColor;
-  ctx.fill();
-
-  // ===========================================
-  // DRAW PRICE INDICATOR DOTS at actual data points
-  // ===========================================
-  if (priceHistory.length > 1) {
-    ctx.globalAlpha = 1;
-    const pointSpacing = width / Math.max(1, priceHistory.length - 1);
-
-    priceHistory.forEach((point, i) => {
-      const x = i * pointSpacing;
-      const y = normalizePrice(point.marketCap);
-
-      // Draw small dot at each data point
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = themeColor;
-      ctx.fill();
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+  if (priceHistory.length > 0) {
+    priceHistory.forEach(p => {
+      if (p.marketCap < minCap) minCap = p.marketCap;
+      if (p.marketCap > maxCap) maxCap = p.marketCap;
     });
   }
 
+  // Ensure there is some range to avoid division by zero
+  const range = maxCap - minCap;
+  const padding = range === 0 ? (initialMarketCap * 0.05) : (range * 0.1); // 10% padding
+
+  const plotMin = minCap - padding;
+  const plotMax = maxCap + padding;
+  const plotRange = Math.max(0.000001, plotMax - plotMin); // Avoid div by zero
+
+  const normalizePrice = (marketCap: number): number => {
+    // Map [plotMin, plotMax] to [chartBottom, chartTop]
+    // Note: Canvas Y is inverted (0 is top)
+    const ratio = (marketCap - plotMin) / plotRange;
+    return chartBottom - (ratio * chartHeight);
+  };
+
+  // Helper to get base trend Y at screen X
+  const getTrendY = (screenX: number): number => {
+    if (priceHistory.length === 0) return centerY;
+
+    // If only one point, constant Y
+    if (priceHistory.length === 1) return normalizePrice(priceHistory[0].marketCap);
+
+    // Multiple points
+    const pointSpacing = width / (priceHistory.length - 1);
+
+    // Find index
+    const idx = Math.floor(screenX / pointSpacing);
+    if (idx < 0) return normalizePrice(priceHistory[0].marketCap);
+    if (idx >= priceHistory.length - 1) return normalizePrice(priceHistory[priceHistory.length - 1].marketCap);
+
+    const p1 = priceHistory[idx];
+    const p2 = priceHistory[idx + 1];
+    const y1 = normalizePrice(p1.marketCap);
+    const y2 = normalizePrice(p2.marketCap);
+
+    // Linear interpolation for trend (or smoothstep)
+    const t = (screenX - (idx * pointSpacing)) / pointSpacing;
+    // Cosine interpolation for smoother trend
+    const smoothT = (1 - Math.cos(t * Math.PI)) / 2;
+    return y1 + (y2 - y1) * smoothT;
+  };
+
+  // Generate "Market Activity" Noise
+  const getNoiseFn = (screenX: number) => {
+    const worldX = screenX + offset;
+    // Layered sine waves for "organic" market noise
+    // High frequency jitter + lower frequency undulation
+    return (
+      Math.sin(worldX * 0.05) * 4 +
+      Math.cos(worldX * 0.15) * 2 +
+      Math.sin(worldX * 0.3 + offset * 0.1) * 2 // Moving component
+    );
+  };
+
+  // Path Construction
+  ctx.beginPath();
+  const step = 4; // Pixel step for drawing
+
+  // Start point
+  let startY = getTrendY(0) + getNoiseFn(0);
+  ctx.moveTo(0, startY);
+
+  for (let x = step; x <= width; x += step) {
+    const trendY = getTrendY(x);
+    const noise = getNoiseFn(x);
+    ctx.lineTo(x, trendY + noise);
+  }
+
+  // Draw Line
+  ctx.strokeStyle = themeColor;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = themeColor;
+  ctx.shadowBlur = 10;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Fill Area
+  ctx.lineTo(width, chartBottom);
+  ctx.lineTo(0, chartBottom);
+  ctx.closePath();
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = themeColor;
+  ctx.fill();
+
+  // Draw "Current Price" Pulse (instead of dots)
+  // We can draw a little pulse at the very end of the line
+  if (priceHistory.length > 0) {
+    const lastX = width;
+    const lastY = getTrendY(width) + getNoiseFn(width);
+
+    // Pulse effect
+    const pulsePhase = (Date.now() / 500) % Math.PI;
+    const pulseSize = 4 + Math.sin(pulsePhase) * 2;
+
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, pulseSize, 0, Math.PI * 2);
+    ctx.fillStyle = themeColor;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, pulseSize + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = themeColor;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 1 - Math.sin(pulsePhase); // Fade out ring
+    ctx.stroke();
+  }
+
   // ===========================================
-  // DRAW BASELINE INDICATOR (1.00x line)
+  // BASELINE INDICATOR (1.00x line)
   // ===========================================
   ctx.globalAlpha = 0.3;
   ctx.strokeStyle = '#ffffff';
@@ -412,24 +590,22 @@ export const drawDynamicChartBackground = (
   // Label for baseline
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#ffffff';
-  ctx.font = '12px VT323';
+  ctx.font = '10px "Press Start 2P"';
   ctx.textAlign = 'left';
   ctx.fillText('1.00x', 5, centerY - 5);
 
   // ===========================================
-  // CURRENT PRICE INDICATOR (right side)
+  // CURRENT PRICE INDICATOR (Label)
   // ===========================================
   if (currentMarketCap > 0 && initialMarketCap > 0) {
     const currentY = normalizePrice(currentMarketCap);
     const multiplier = currentMarketCap / initialMarketCap;
 
     ctx.globalAlpha = 1;
-
-    // Glow effect
     ctx.shadowBlur = 20;
     ctx.shadowColor = multiplier >= 1 ? '#22c55e' : '#ef4444';
 
-    // Horizontal line to current price
+    // Right-side indicator line (small)
     ctx.strokeStyle = multiplier >= 1 ? '#22c55e' : '#ef4444';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -439,10 +615,9 @@ export const drawDynamicChartBackground = (
 
     // Price label
     ctx.fillStyle = multiplier >= 1 ? '#22c55e' : '#ef4444';
-    ctx.font = 'bold 14px VT323';
+    ctx.font = '12px "Press Start 2P"';
     ctx.textAlign = 'right';
     ctx.fillText(`${multiplier.toFixed(2)}x`, width - 5, currentY - 8);
-
     ctx.shadowBlur = 0;
   }
 

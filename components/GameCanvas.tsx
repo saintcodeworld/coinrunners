@@ -14,7 +14,8 @@ import {
   COIN_SIZE,
   GAME_SPEED_INITIAL,
   COIN_VALUE_USD,
-  SKILLS
+  SKILLS,
+  RED_COIN_VALUE_USD
 } from '../constants';
 import { drawObstacle, drawCoin, drawDynamicChartBackground, drawPlayer } from '../utils/drawUtils';
 
@@ -47,6 +48,13 @@ const GameCanvas = memo<GameCanvasProps>(({
   const shieldUsedRef = useRef(false);
   const isRecoveringRef = useRef(false);
   const recoveryEndTimeRef = useRef(0);
+
+  // Keep activeRoom in a ref to avoid restarting the game loop on every update
+  const activeRoomRef = useRef(activeRoom);
+
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
 
   const activateSkill = useCallback((skill: Skill) => {
     const now = Date.now();
@@ -220,13 +228,17 @@ const GameCanvas = memo<GameCanvasProps>(({
           ? CANVAS_HEIGHT - FLOOR_HEIGHT - 130
           : CANVAS_HEIGHT - FLOOR_HEIGHT - 50;
 
+        // 20% chance for Red Coin
+        const isRed = Math.random() < 0.2;
+
         coinsRef.current.push({
           x,
           y,
           width: COIN_SIZE,
           height: COIN_SIZE,
           collected: false,
-          value: COIN_VALUE_USD // $0.02 per coin
+          value: isRed ? RED_COIN_VALUE_USD : COIN_VALUE_USD,
+          type: isRed ? 'red' : 'green'
         });
       }
     }
@@ -382,8 +394,8 @@ const GameCanvas = memo<GameCanvasProps>(({
       coinsRef.current = coinsRef.current.filter(coin => {
         coin.x -= gameSpeedRef.current;
 
-        // Magnet Effect
-        if (magnetActive) {
+        // Magnet Effect (Only Green Coins)
+        if (magnetActive && coin.type !== 'red') {
           const dx = playerRef.current.x - coin.x;
           const dy = playerRef.current.y - coin.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -402,14 +414,19 @@ const GameCanvas = memo<GameCanvasProps>(({
         if (isCollected) {
           coin.collected = true;
           // --- SCORE MULTIPLIER LOGIC ---
-          const multipliedValue = coin.value * activeRoom.multiplier;
+          const multipliedValue = coin.value * activeRoomRef.current.multiplier;
 
-          scoreRef.current += multipliedValue;
-          createParticles(coin.x, coin.y, '#14F195', 8);
-
-          // Update React State occasionally to avoid spamming re-renders? 
-          // Actually setScore triggers re-render. We should throttle or just set it.
-          setScore(prev => prev + multipliedValue);
+          if (coin.type === 'red') {
+            createParticles(coin.x, coin.y, '#ef4444', 8); // Red particles
+            // Ensure score doesn't drop below 0 optional? User didn't specify. 
+            // We'll allow it to subtract from total earnings.
+            setScore(prev => Math.max(0, prev + multipliedValue)); // multipliedValue is negative
+            scoreRef.current = Math.max(0, scoreRef.current + multipliedValue);
+          } else {
+            createParticles(coin.x, coin.y, '#14F195', 8); // Green particles
+            setScore(prev => prev + multipliedValue);
+            scoreRef.current += multipliedValue;
+          }
 
           return false; // Remove from array
         }
@@ -435,7 +452,7 @@ const GameCanvas = memo<GameCanvasProps>(({
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Dynamic Chart Background based on Room Theme and Real Price Data
-    const currentTheme = activeRoom.themeColor;
+    const currentTheme = activeRoomRef.current.themeColor;
     const bgOffset = distanceRef.current * 0.2;
     drawDynamicChartBackground(
       ctx,
@@ -443,13 +460,13 @@ const GameCanvas = memo<GameCanvasProps>(({
       CANVAS_HEIGHT,
       bgOffset,
       currentTheme,
-      activeRoom.priceHistory || [],
-      activeRoom.initialMarketCap,
-      activeRoom.currentMarketCap
+      activeRoomRef.current.priceHistory || [],
+      activeRoomRef.current.initialMarketCap,
+      activeRoomRef.current.currentMarketCap
     );
 
     // Floor
-    ctx.fillStyle = '#0f172a';
+    ctx.fillStyle = '#121212';
     ctx.fillRect(0, CANVAS_HEIGHT - FLOOR_HEIGHT, CANVAS_WIDTH, FLOOR_HEIGHT);
     ctx.fillStyle = currentTheme; // Floor border matches room theme
     ctx.fillRect(0, CANVAS_HEIGHT - FLOOR_HEIGHT, CANVAS_WIDTH, 2);
@@ -519,14 +536,14 @@ const GameCanvas = memo<GameCanvasProps>(({
 
         // Timer text
         ctx.fillStyle = 'white';
-        ctx.font = '10px monospace';
+        ctx.font = '8px "Press Start 2P"';
         ctx.textAlign = 'center';
         ctx.fillText(Math.ceil((state.cooldownEnd - now) / 1000).toString(), x + 20, hudY + 25);
       }
 
       // Trigger Key
       ctx.fillStyle = 'white';
-      ctx.font = 'bold 12px monospace';
+      ctx.font = '10px "Press Start 2P"';
       ctx.textAlign = 'right';
       ctx.fillText(skill.triggerKey || '', x + 38, hudY + 12);
 
@@ -537,7 +554,7 @@ const GameCanvas = memo<GameCanvasProps>(({
     });
 
     requestRef.current = requestAnimationFrame(update);
-  }, [gameState, setGameState, setScore, setGameSpeedDisplay, activeRoom]);
+  }, [gameState, setGameState, setScore, setGameSpeedDisplay]); // activeRoom removed from dependencies
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(update);

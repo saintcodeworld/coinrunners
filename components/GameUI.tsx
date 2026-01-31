@@ -1,8 +1,11 @@
 import React, { useState, useEffect, memo } from 'react';
+import Shuffle from './Shuffle';
 import { GameState, Room, SkinSettings, Skill } from '../types';
 import { isValidSolanaAddress } from '../constants';
 import { UserWallet, truncateAddress } from '../utils/walletUtils';
+import { drawPlayer } from '../utils/drawUtils';
 import WalletManager from './WalletManager';
+import Leaderboard from './Leaderboard';
 
 interface GameUIProps {
   gameState: GameState;
@@ -20,6 +23,7 @@ interface GameUIProps {
   user: UserWallet | null;
   solPrice: number;
   onWithdraw: (amount: number) => void;
+  onLogout: () => void;
   // Shop Props
   skins: SkinSettings[];
   skills: Skill[];
@@ -124,7 +128,7 @@ const RoomCard = memo<{
   <div className="relative group">
     <button
       onClick={onClick}
-      className="terminal-card bg-slate-900/80 backdrop-blur p-5 hover:bg-slate-800 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/20 text-left flex flex-col justify-between min-h-[160px] w-full border border-slate-700/50 rounded-xl relative overflow-hidden"
+      className="minecraft-panel-dark p-5 transition-all duration-100 hover:scale-[1.02] text-left flex flex-col justify-between min-h-[160px] w-full relative overflow-hidden"
       style={{ borderLeftWidth: '4px', borderLeftColor: room.themeColor }}
     >
       <div className="flex items-start gap-3">
@@ -176,6 +180,44 @@ const RoomCard = memo<{
 
 RoomCard.displayName = 'RoomCard';
 
+// Skin Preview Component - Uses the actual game drawing logic (Memoized)
+const SkinPreview = memo<{ skin: SkinSettings }>(({ skin }) => {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false; // Keep pixel art look
+
+    // Dummy player for preview
+    // Center in 60x60 logical canvas
+    // Player is roughly 40x40
+    const dummyPlayer: any = {
+      x: 10,
+      y: 10,
+      width: 40,
+      height: 40,
+      isJumping: false,
+      color: skin.hoodieColor,
+      // Velocity properties needed by type but ignored by draw logic can be mocked
+      vy: 0
+    };
+
+    // Draw frame 0 (Idle)
+    drawPlayer(ctx, dummyPlayer, 0, skin);
+
+  }, [skin]);
+
+  return <canvas ref={canvasRef} width={60} height={60} className="w-16 h-16 object-contain pixelated" />;
+});
+
+SkinPreview.displayName = 'SkinPreview';
+
 // Main GameUI Component - Memoized
 const GameUI = memo<GameUIProps>(({
   gameState,
@@ -193,6 +235,7 @@ const GameUI = memo<GameUIProps>(({
   user,
   solPrice,
   onWithdraw,
+  onLogout,
   skins = [],
   skills = [],
   ownedSkins = [],
@@ -269,7 +312,7 @@ const GameUI = memo<GameUIProps>(({
         <div className="flex justify-between items-start w-full gap-4">
 
           {/* Portfolio / Score */}
-          <div className="terminal-card bg-slate-900 px-4 py-2 flex-1 max-w-xs pointer-events-auto">
+          <div className="minecraft-panel-dark px-4 py-2 flex-1 max-w-xs pointer-events-auto">
             <div className="text-xs text-slate-400 mb-1">EARNINGS</div>
             <div className="text-2xl font-bold text-solana pixel-font flex items-center gap-1">
               <span className="text-xl">$</span>
@@ -281,14 +324,14 @@ const GameUI = memo<GameUIProps>(({
 
           {/* ROOM INFO with Logo */}
           <div
-            className={`terminal-card bg-slate-900 px-6 py-2 flex-1 text-center border-t-4 transition-all duration-300 pointer-events-auto ${flashClass}`}
-            style={{ borderColor: activeRoom.themeColor }}
+            className={`minecraft-panel-dark px-6 py-2 flex-1 text-center transition-all duration-100 pointer-events-auto ${flashClass}`}
+            style={{ borderBottom: `4px solid ${activeRoom.themeColor}` }}
           >
             <div className="flex items-center justify-center gap-3 mb-1">
               <TokenLogo logoUrl={activeRoom.logoUrl} ticker={activeRoom.ticker} size={28} />
               <div>
                 <div className="text-xs text-slate-400">
-                  {activeRoom.isMeta ? 'META COIN' : 'CUSTOM COIN'}
+                  COIN
                 </div>
                 <div className="text-2xl font-bold pixel-font transition-colors duration-300" style={{ color: activeRoom.themeColor }}>
                   ${activeRoom.ticker}
@@ -304,7 +347,7 @@ const GameUI = memo<GameUIProps>(({
           </div>
 
           {/* Multiplier */}
-          <div className={`terminal-card bg-slate-900 px-4 py-2 flex-1 max-w-xs text-right transition-all duration-300 pointer-events-auto ${flashClass}`}>
+          <div className={`minecraft-panel-dark px-4 py-2 flex-1 max-w-xs text-right transition-all duration-100 pointer-events-auto ${flashClass}`}>
             <div className="text-xs text-slate-400 mb-1">ACTIVE REWARDS</div>
             <div className={`text-2xl font-bold pixel-font transition-all duration-500 ${activeRoom.multiplier > 1.2 ? 'text-glow-green' :
               activeRoom.multiplier < 0.8 ? 'text-glow-red' : 'text-white'
@@ -327,103 +370,85 @@ const GameUI = memo<GameUIProps>(({
 
         {/* DASHBOARD (MENU) - Full Page Landing */}
         {gameState === GameState.MENU && (
-          <div className="min-h-screen w-full bg-slate-950 flex flex-col py-12 px-6 pointer-events-auto overflow-y-auto">
+          <div className="fixed inset-0 w-full h-full bg-slate-950 flex flex-col py-12 px-6 pointer-events-auto overflow-y-auto z-40">
             {/* Hero Section */}
             <div className="text-center mb-12 relative">
 
+              {/* LEADERBOARD - Top Left */}
+              <div className="fixed top-6 left-6 z-50">
+                <Leaderboard />
+              </div>
+
               {/* User Info & Wallet Manager */}
               {user && (
-                <div className="absolute top-0 right-0 hidden md:block">
-                  <WalletManager user={user} solPrice={solPrice} onWithdraw={onWithdraw} />
+                <div className="fixed top-6 right-6 z-50 hidden md:block">
+                  <WalletManager user={user} solPrice={solPrice} onWithdraw={onWithdraw} onLogout={onLogout} />
                 </div>
               )}
-              <h1 className="text-6xl md:text-7xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-500 to-teal-400 pixel-font tracking-widest drop-shadow-lg">
-                DEGEN TERMINAL
-              </h1>
-              <p className="text-lg text-slate-400 mb-2">Trade memecoins in real-time • Powered by DexScreener</p>
+              <div className="mb-4">
+                <Shuffle
+                  text="Rugs Runner"
+                  className="text-5xl md:text-6xl font-bold text-white pixel-font tracking-widest drop-shadow-lg text-shadow"
+                  shuffleDirection="right"
+                  colorTo="white"
+                  tag="h1"
+                  loop={true}
+                  triggerOnHover={false}
+                />
+              </div>
+              <p className="text-lg text-slate-400 mb-2">Mine tokens in real-time • Powered by DexScreener</p>
 
               <button
                 onClick={() => setIsShopOpen(true)}
-                className="mt-6 px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg border-2 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all transform hover:scale-105 pixel-font tracking-wider"
+                className="mt-6 btn-minecraft btn-minecraft-purple px-8 py-3 font-bold tracking-wider"
               >
                 🛍️ ITEM SHOP
               </button>
 
-              <div className="mt-8 mx-auto w-64 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-50"></div>
+              <div className="mt-8 mx-auto w-64 h-2 bg-slate-700"></div>
             </div>
 
-            {/* META COINS SECTION */}
+            {/* COINS SECTION */}
             <div className="max-w-7xl mx-auto w-full mb-16">
               <div className="flex items-center gap-4 mb-6">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-30"></div>
                 <h2 className="text-2xl font-bold text-purple-400 pixel-font tracking-wider flex items-center gap-3">
-                  <span className="text-3xl">⭐</span> META COINS
+                  <span className="text-3xl">🪙</span> COINS
                 </h2>
                 <div className="h-px flex-1 bg-gradient-to-r from-purple-500 via-transparent to-transparent opacity-30"></div>
               </div>
-              <p className="text-slate-500 text-sm text-center mb-6">Featured Solana memecoins with live price tracking</p>
+              <p className="text-slate-500 text-sm text-center mb-6">Trade and run with your favorite tokens</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                {metaCoins.map((room) => (
-                  <RoomCard
-                    key={room.id}
-                    room={room}
-                    onClick={() => selectRoom(room)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* CREATED COINS SECTION */}
-            <div className="max-w-7xl mx-auto w-full">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent opacity-30"></div>
-                <h2 className="text-2xl font-bold text-orange-400 pixel-font tracking-wider flex items-center gap-3">
-                  <span className="text-3xl">🚀</span> CUSTOM COINS
-                </h2>
-                <div className="h-px flex-1 bg-gradient-to-r from-orange-500 via-transparent to-transparent opacity-30"></div>
-              </div>
-              <p className="text-slate-500 text-sm text-center mb-6">Add any Solana token by contract address (CA)</p>
-
-              {/* Add Coin Form */}
-              <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-6 mb-8 max-w-2xl mx-auto">
+              {/* Create New Coin Form */}
+              <div className="minecraft-panel px-6 py-6 mb-8 max-w-2xl mx-auto">
                 {!isAdding ? (
                   <button
                     onClick={() => setIsAdding(true)}
-                    className="w-full py-4 border-2 border-dashed border-slate-600 rounded-lg text-slate-400 hover:border-orange-500 hover:text-orange-400 transition-all flex items-center justify-center gap-3 text-lg"
+                    className="w-full py-4 border-4 border-dashed border-slate-500 text-slate-700 hover:border-slate-800 hover:text-slate-900 transition-all flex items-center justify-center gap-3 text-lg font-bold"
                   >
                     <span className="text-2xl">+</span>
-                    Add Custom Coin by CA
+                    Create new coin
                   </button>
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm text-slate-400 mb-2">Contract Address (CA) *</label>
+                      <label className="block text-sm text-slate-800 mb-2 font-bold">Contract Address (CA) *</label>
                       <input
                         type="text"
                         value={contractInput}
                         onChange={(e) => setContractInput(e.target.value)}
                         placeholder="Enter Solana token contract address..."
-                        className={`w-full px-4 py-3 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none transition-colors font-mono text-sm ${validationError ? 'border-red-500 focus:border-red-400' : 'border-slate-600 focus:border-orange-500'
+                        className={`w-full px-4 py-3 bg-slate-800 border-4 text-white placeholder-slate-500 focus:outline-none transition-colors font-mono text-sm ${validationError ? 'border-red-500' : 'border-slate-600'
                           }`}
                       />
                       {validationError && (
-                        <p className="text-red-400 text-xs mt-2">{validationError}</p>
+                        <p className="text-red-500 text-xs mt-2 font-bold">{validationError}</p>
                       )}
                       <p className="text-slate-600 text-xs mt-2">
                         Example: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
                       </p>
                     </div>
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-2">Display Name (Optional)</label>
-                      <input
-                        type="text"
-                        value={nameInput}
-                        onChange={(e) => setNameInput(e.target.value)}
-                        placeholder="e.g. My Token"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
-                      />
-                    </div>
+
                     <div className="flex gap-3">
                       <button
                         onClick={() => {
@@ -433,16 +458,16 @@ const GameUI = memo<GameUIProps>(({
                           setValidationError(null);
                         }}
                         disabled={isVerifyingCoin}
-                        className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors disabled:opacity-50"
+                        className="flex-1 btn-minecraft"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleAddCoin}
                         disabled={!!validationError || !contractInput.trim() || isVerifyingCoin}
-                        className={`flex-1 py-3 rounded-lg text-white font-bold transition-colors flex items-center justify-center gap-2 ${validationError || !contractInput.trim() || isVerifyingCoin
-                          ? 'bg-slate-600 cursor-not-allowed opacity-50'
-                          : 'bg-orange-600 hover:bg-orange-500'
+                        className={`flex-1 btn-minecraft btn-minecraft-green ${validationError || !contractInput.trim() || isVerifyingCoin
+                          ? 'opacity-50 cursor-not-allowed'
+                          : ''
                           }`}
                       >
                         {isVerifyingCoin ? (
@@ -459,26 +484,18 @@ const GameUI = memo<GameUIProps>(({
                 )}
               </div>
 
-              {/* Created Coins Grid */}
-              {createdCoins.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {createdCoins.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onClick={() => selectRoom(room)}
-                      onRemove={() => removeCustomCoin(room.id)}
-                      showRemove={true}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-slate-600">
-                  <div className="text-4xl mb-4">🪙</div>
-                  <p>No custom coins added yet</p>
-                  <p className="text-sm mt-2">Paste a Solana contract address to start trading!</p>
-                </div>
-              )}
+              {/* All Coins Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {[...metaCoins, ...createdCoins].map((room) => (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    onClick={() => selectRoom(room)}
+                    onRemove={() => removeCustomCoin(room.id)}
+                    showRemove={!room.isMeta}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* API Info */}
@@ -490,80 +507,110 @@ const GameUI = memo<GameUIProps>(({
         )}
 
         {/* START SCREEN */}
+        {/* START SCREEN POPUP */}
         {gameState === GameState.START && activeRoom && (
-          <div className="terminal-card bg-slate-900 p-8 max-w-lg w-full text-center pointer-events-auto transform transition-all duration-300 hover:scale-[1.01]">
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <TokenLogo logoUrl={activeRoom.logoUrl} ticker={activeRoom.ticker} size={48} />
-              <div className="text-left">
-                <div className="text-xs text-slate-500 uppercase tracking-wider">
-                  {activeRoom.isMeta ? '⭐ META COIN' : '🚀 CUSTOM COIN'}
-                </div>
-                <h1 className="text-4xl font-bold pixel-font tracking-widest" style={{ color: activeRoom.themeColor }}>
-                  ${activeRoom.ticker}
-                </h1>
-                {activeRoom.pairName && (
-                  <div className="text-xs text-slate-500">{activeRoom.pairName}</div>
-                )}
-              </div>
-            </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-            <div className="h-1 w-full bg-gradient-to-r from-transparent via-white to-transparent mb-6 opacity-20"></div>
+            {/* Modal */}
+            <div className="relative minecraft-panel-dark w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-y-auto animate-In p-6">
 
-            {activeRoom.isLoading ? (
-              <div className="text-slate-400 text-lg mb-8">
-                <div className="animate-pulse">Fetching market data...</div>
-                <div className="text-sm text-slate-600 mt-2">Setting 1.00x baseline</div>
-              </div>
-            ) : activeRoom.lastFetchError ? (
-              <div className="text-red-400 text-lg mb-8">
-                <div>⚠ Coin Data Unavailable</div>
-                <div className="text-sm text-slate-500 mt-2">Check contract address and try again</div>
-              </div>
-            ) : (
-              <div className="text-slate-300 text-lg mb-8 leading-relaxed">
-                <div className="bg-slate-800/50 p-4 rounded mb-4">
-                  <div className="text-xs text-slate-500 mb-1">INITIAL MARKET CAP (1.00x BASELINE)</div>
-                  <div className="text-2xl font-bold" style={{ color: activeRoom.themeColor }}>
-                    ${formatMC(activeRoom.initialMarketCap)}
+              {/* Header / Token Info */}
+              <div className="flex items-center justify-center gap-4 mb-6 pb-6 border-b border-slate-700">
+                <TokenLogo logoUrl={activeRoom.logoUrl} ticker={activeRoom.ticker} size={48} />
+                <div className="text-left">
+                  <div className="text-xs text-slate-500 uppercase tracking-wider">
+                    COIN
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">
-                    Liquidity: ${formatMC(activeRoom.liquidity)}
+                  <h1 className="text-4xl font-bold pixel-font tracking-widest" style={{ color: activeRoom.themeColor }}>
+                    ${activeRoom.ticker}
+                  </h1>
+                </div>
+              </div>
+
+              {/* Market Stats */}
+              {!activeRoom.isLoading && !activeRoom.lastFetchError && (
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-slate-800/50 p-3 rounded">
+                    <div className="text-xs text-slate-500">MARKET CAP</div>
+                    <div className="text-xl font-bold text-white">${formatMC(activeRoom.currentMarketCap || activeRoom.initialMarketCap)}</div>
+                  </div>
+                  <div className="bg-slate-800/50 p-3 rounded">
+                    <div className="text-xs text-slate-500">MULTIPLIER</div>
+                    <div className="text-xl font-bold" style={{ color: activeRoom.themeColor }}>{activeRoom.multiplier.toFixed(2)}x</div>
                   </div>
                 </div>
-                <div className="text-xs text-slate-500">
-                  <span className="text-green-400">Price ↑ = Higher Multiplier</span> •
-                  <span className="text-red-400 ml-2">Price ↓ = Lower Multiplier</span>
+              )}
+
+              {/* SKILL SELECTION */}
+              <div className="mb-8">
+                <div className="flex justify-between items-end mb-4 border-b border-slate-700 pb-2">
+                  <div>
+                    <h3 className="text-xl font-bold text-purple-400 pixel-font">BUY POWER-UPS</h3>
+                    <p className="text-xs text-slate-500">Select for this round</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-2xl font-bold pixel-font ${activeSkillIds.length === 3 ? 'text-red-400' : 'text-slate-400'}`}>{activeSkillIds.length}/3</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {skills.map(skill => {
+                    const isSelected = activeSkillIds.includes(skill.id);
+                    return (
+                      <button
+                        key={skill.id}
+                        onClick={() => equipSkill(skill.id)}
+                        className={`p-3 rounded-lg border-2 text-left transition-all relative overflow-hidden group ${isSelected ? 'border-purple-500 bg-purple-900/30' : 'border-slate-700 bg-slate-800 hover:border-slate-500'}`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="text-2xl mb-2 block">{skill.icon}</span>
+                          {isSelected && <span className="text-purple-400 text-xs font-bold">READY</span>}
+                        </div>
+                        <div className="font-bold text-sm text-white">{skill.name}</div>
+                        <div className="text-[10px] text-slate-400 leading-tight mt-1">{skill.description}</div>
+
+                        {/* Price Tag or Free */}
+                        <div className="mt-2 text-xs font-bold text-green-400">
+                          {skill.cost > 0 ? `$${skill.cost}` : 'FREE'}
+                        </div>
+
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="text-[10px] font-mono bg-slate-950 px-1 rounded text-slate-300">
+                            {skill.triggerKey ? `Key: ${skill.triggerKey}` : 'Passive'}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            )}
 
-            <div className="flex gap-4">
-              <button
-                onClick={goToMenu}
-                className="btn-retro flex-1 py-4 text-xl font-bold tracking-wider border-slate-600 text-slate-400 hover:bg-slate-800"
-              >
-                BACK
-              </button>
-              <button
-                onClick={startGame}
-                disabled={activeRoom.isLoading || activeRoom.lastFetchError}
-                className={`btn-retro flex-1 py-4 text-xl font-bold tracking-wider ${activeRoom.isLoading || activeRoom.lastFetchError ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                style={{
-                  borderColor: activeRoom.themeColor,
-                  color: activeRoom.themeColor,
-                  boxShadow: `0 4px 0 ${activeRoom.themeColor}33`
-                }}
-              >
-                {activeRoom.isLoading ? 'LOADING...' : activeRoom.lastFetchError ? 'UNAVAILABLE' : 'ENTER'}
-              </button>
+              {/* Actions */}
+              <div className="flex gap-4 mt-auto">
+                <button
+                  onClick={goToMenu}
+                  className="btn-minecraft flex-1 py-4 text-xl font-bold tracking-wider"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={startGame}
+                  disabled={activeRoom.isLoading || activeRoom.lastFetchError}
+                  className={`btn-minecraft btn-minecraft-green flex-1 py-4 text-xl font-bold tracking-wider text-white ${activeRoom.isLoading || activeRoom.lastFetchError ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                >
+                  START GAME
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* GAME OVER SCREEN */}
         {gameState === GameState.GAMEOVER && activeRoom && (
-          <div className="terminal-card bg-slate-900 p-8 max-w-md w-full text-center pointer-events-auto border-red-900/50 shadow-red-900/20">
+          <div className="minecraft-panel-dark p-8 max-w-md w-full text-center pointer-events-auto border-red-900/50 shadow-red-900/20">
             <h1 className="text-7xl font-bold mb-4 text-red-600 pixel-font shake tracking-tighter" style={{ textShadow: '4px 4px 0px #450a0a' }}>
               RUGGED
             </h1>
@@ -579,13 +626,13 @@ const GameUI = memo<GameUIProps>(({
             <div className="space-y-3">
               <button
                 onClick={restartGame}
-                className="btn-retro btn-retro-red w-full py-3 text-xl font-bold tracking-wider"
+                className="btn-minecraft btn-minecraft-red w-full py-3 text-xl font-bold tracking-wider"
               >
                 RE-ENTER ${activeRoom.ticker}
               </button>
               <button
                 onClick={goToMenu}
-                className="btn-retro w-full py-3 text-xl font-bold tracking-wider border-slate-600 text-slate-400 hover:bg-slate-800"
+                className="btn-minecraft w-full py-3 text-xl font-bold tracking-wider"
               >
                 DASHBOARD
               </button>
@@ -607,11 +654,11 @@ const GameUI = memo<GameUIProps>(({
         isShopOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsShopOpen(false)} />
-            <div className="relative bg-slate-900 border-2 border-slate-700 w-full max-w-4xl h-[80vh] rounded-xl flex flex-col shadow-2xl overflow-hidden animate-In">
+            <div className="relative minecraft-panel-dark w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden animate-In">
 
               {/* Header */}
-              <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-950">
-                <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 pixel-font">
+              <div className="p-6 border-b-4 border-black flex justify-between items-center bg-[#111]">
+                <h2 className="text-3xl font-bold text-white pixel-font text-shadow">
                   ITEM SHOP
                 </h2>
                 <button onClick={() => setIsShopOpen(false)} className="text-slate-400 hover:text-white text-2xl">
@@ -619,97 +666,43 @@ const GameUI = memo<GameUIProps>(({
                 </button>
               </div>
 
-              {/* Tabs */}
               <div className="flex border-b border-slate-700">
-                <button
-                  className={`flex-1 py-4 text-center font-bold tracking-wider transition-colors ${shopTab === 'skins' ? 'bg-purple-900/30 text-purple-400 border-b-2 border-purple-500' : 'text-slate-500 hover:bg-slate-800'}`}
-                  onClick={() => setShopTab('skins')}
+                <div
+                  className="flex-1 py-4 text-center font-bold tracking-wider text-purple-400 border-b-2 border-purple-500"
                 >
                   SKINS ({skins.length})
-                </button>
-                <button
-                  className={`flex-1 py-4 text-center font-bold tracking-wider transition-colors ${shopTab === 'skills' ? 'bg-purple-900/30 text-purple-400 border-b-2 border-purple-500' : 'text-slate-500 hover:bg-slate-800'}`}
-                  onClick={() => setShopTab('skills')}
-                >
-                  SKILLS ({skills.length})
-                </button>
+                </div>
               </div>
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-6 bg-slate-900/50">
-                {shopTab === 'skins' ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {skins.map(skin => {
-                      const isOwned = ownedSkins.includes(skin.id);
-                      const isEquipped = selectedSkinId === skin.id;
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {skins.map(skin => {
+                    const isOwned = ownedSkins.includes(skin.id);
+                    const isEquipped = selectedSkinId === skin.id;
 
-                      return (
-                        <div key={skin.id} className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 relative ${isEquipped ? 'border-green-500 bg-green-900/20' : 'border-slate-700 bg-slate-800 hover:border-purple-500'}`}>
-                          {/* Preview Placeholder */}
-                          <div className="w-16 h-16 relative">
-                            {/* Simple CSS representation of skin */}
-                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-10 rounded-sm" style={{ backgroundColor: skin.pantsColor }} />
-                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-10 h-8 rounded-sm" style={{ backgroundColor: skin.hoodieColor }} />
-                            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-6 rounded-sm" style={{ backgroundColor: skin.skinColor }} />
-                            {skin.accessory !== 'none' && (
-                              <div className="absolute top-2 left-1/2 -translate-x-1/2 text-xs">👓</div>
-                            )}
-                          </div>
-
-                          <div className="text-center">
-                            <div className="font-bold text-white mb-1">{skin.name}</div>
-                            <div className="text-xs text-slate-400 uppercase">{skin.accessory}</div>
-                          </div>
-
-                          <button
-                            onClick={() => isOwned ? equipSkin(skin.id) : buySkin(skin.id)}
-                            className={`w-full py-2 rounded font-bold text-sm ${isEquipped ? 'bg-green-600 text-white cursor-default' : isOwned ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}
-                          >
-                            {isEquipped ? 'EQUIPPED' : isOwned ? 'EQUIP' : 'FREE'}
-                          </button>
+                    return (
+                      <div key={skin.id} className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 relative ${isEquipped ? 'border-green-500 bg-green-900/20' : 'border-slate-700 bg-slate-800 hover:border-purple-500'}`}>
+                        {/* Preview Placeholder */}
+                        <div className="w-20 h-20 flex items-center justify-center bg-slate-900/50 rounded-lg mb-2">
+                          <SkinPreview skin={skin} />
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {skills.map(skill => {
-                      const isOwned = ownedSkills.includes(skill.id);
-                      const isActive = activeSkillIds.includes(skill.id);
 
-                      return (
-                        <div key={skill.id} className={`p-6 rounded-xl border-2 transition-all flex items-start gap-4 ${isActive ? 'border-green-500 bg-green-900/20' : 'border-slate-700 bg-slate-800'}`}>
-                          <div className="text-4xl bg-slate-900 p-3 rounded-lg border border-slate-700">
-                            {skill.icon}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-bold text-xl text-white">{skill.name}</h3>
-                              {isOwned && (
-                                <button
-                                  onClick={() => equipSkill(skill.id)}
-                                  className={`px-4 py-1 rounded text-xs font-bold ${isActive ? 'bg-green-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-white'}`}
-                                >
-                                  {isActive ? 'ACTIVE' : 'ACTIVATE'}
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-slate-400 text-sm mb-3">{skill.description}</p>
-                            <div className="flex gap-4 text-xs font-mono text-slate-500">
-                              <span>⏱️ Duration: {skill.durationMs / 1000}s</span>
-                              <span>Cooldown: {skill.cooldownMs / 1000}s</span>
-                            </div>
-                            {!isOwned && (
-                              <button onClick={() => buySkill(skill.id)} className="mt-3 w-full py-2 bg-purple-600 hover:bg-purple-500 rounded font-bold text-white text-sm">
-                                UNLOCK (FREE)
-                              </button>
-                            )}
-                          </div>
+                        <div className="text-center">
+                          <div className="font-bold text-white mb-1">{skin.name}</div>
+                          <div className="text-xs text-slate-400 uppercase">{skin.accessory}</div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+
+                        <button
+                          onClick={() => isOwned ? equipSkin(skin.id) : buySkin(skin.id)}
+                          className={`w-full py-2 rounded font-bold text-sm ${isEquipped ? 'bg-green-600 text-white cursor-default' : isOwned ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}
+                        >
+                          {isEquipped ? 'EQUIPPED' : isOwned ? 'EQUIP' : 'FREE'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
             </div>

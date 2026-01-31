@@ -33,6 +33,7 @@ export interface Obstacle extends Entity {
 export interface Coin extends Entity {
   collected: boolean;
   value: number;
+  type: 'green' | 'red';
 }
 
 export interface Particle {
@@ -110,6 +111,13 @@ export interface SkinSettings {
   skinColor: string;
   accessory: 'none' | 'sunglasses' | 'hat' | 'cap' | 'headphones' | 'bandana' | 'tophat' | 'crown' | 'mask' | 'visor';
   accessoryColor?: string;
+  // Visual customization
+  model?: 'human' | 'penguin' | 'lobster' | 'robot' | 'skeleton';
+  headScale?: number; // Default 1.0
+  bodyScale?: number; // Default 1.0 (width multiplier)
+  // Extra Cosmetics
+  chain?: boolean;
+  footwear?: 'none' | 'boots' | 'sneakers' | 'flippers';
 }
 
 export enum SkillType {
@@ -131,4 +139,12 @@ export interface Skill {
   cost: number;
   triggerKey?: string; // e.g. 'S', 'Z'
   icon: string; // Emoji character for now
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: string;
+  text: string;
+  timestamp: number;
+  isSystem?: boolean;
 }

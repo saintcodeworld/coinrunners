@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import GameCanvas from './components/GameCanvas';
 import GameUI from './components/GameUI';
+import AdminPanel from './components/AdminPanel';
 import { ToastContainer, useToast } from './components/Toast';
 import { GameState, Room, PricePoint, DexScreenerPair, DexScreenerResponse, SkinSettings, Skill } from './types';
 import {
@@ -15,10 +16,12 @@ import {
   RANDOM_THEME_COLORS
 } from './constants';
 import AuthModal from './components/AuthModal';
-import { UserWallet, truncateAddress } from './utils/walletUtils';
+import LiveChat from './components/LiveChat';
+import { UserWallet, truncateAddress, loginWithPrivateKey } from './utils/walletUtils';
 
-// LocalStorage key for custom coins
+// LocalStorage keys
 const CUSTOM_COINS_KEY = 'degen_runner_custom_coins';
+const USER_SESSION_KEY = 'degen_runner_session';
 
 // ===========================================
 // DEXSCREENER API HELPER
@@ -36,7 +39,8 @@ interface FetchResult {
 const fetchDexScreenerData = async (tokenAddress: string): Promise<FetchResult> => {
   try {
     const response = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`
+      `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}?t=${Date.now()}`,
+      { cache: 'no-store' }
     );
 
     if (!response.ok) {
@@ -109,8 +113,34 @@ function App() {
   // Handle Login / Signup result
   const handleLogin = (wallet: UserWallet) => {
     setUser(wallet);
+    // Persist session
+    localStorage.setItem(USER_SESSION_KEY, wallet.secretKey);
     addToast('Welcome to the on-chain arena!', 'success');
   };
+
+  // Handle Logout
+  const handleLogout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem(USER_SESSION_KEY);
+    setGameState(GameState.MENU);
+    addToast('Logged out successfully', 'info');
+  }, [addToast]);
+
+  // Load session on mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem(USER_SESSION_KEY);
+    if (savedSession) {
+      const wallet = loginWithPrivateKey(savedSession);
+      if (wallet) {
+        // Load balance
+        const storedBalance = localStorage.getItem(`balance_${wallet.publicKey}`);
+        if (storedBalance) {
+          wallet.balanceUsd = parseFloat(storedBalance);
+        }
+        setUser(wallet);
+      }
+    }
+  }, []);
 
   // Save balance to LocalStorage whenever it changes
   useEffect(() => {
@@ -150,8 +180,23 @@ function App() {
     });
   };
 
-  // Meta Coins (preset 10 coins)
-  const [metaCoins, setMetaCoins] = useState<Room[]>(META_COINS);
+  // ===========================================
+  // META COINS STATE (Persisted)
+  // ===========================================
+  const [metaCoins, setMetaCoins] = useState<Room[]>(() => {
+    try {
+      const saved = localStorage.getItem('degen_runner_meta_coins_v1');
+      return saved ? JSON.parse(saved) : META_COINS;
+    } catch (e) {
+      console.error('Failed to load meta coins', e);
+      return META_COINS;
+    }
+  });
+
+  // Save Meta Coins to LS on change
+  useEffect(() => {
+    localStorage.setItem('degen_runner_meta_coins_v1', JSON.stringify(metaCoins));
+  }, [metaCoins]);
 
   // Created Coins (user added)
   const [createdCoins, setCreatedCoins] = useState<Room[]>([]);
@@ -181,10 +226,24 @@ function App() {
   }, [ownedSkins]);
 
   const equipSkill = useCallback((id: string) => {
-    if (ownedSkills.includes(id)) {
-      setActiveSkillIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    setActiveSkillIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(i => i !== id); // Toggle Off
+      }
+      if (prev.length >= 3) {
+        // Max 3 limit
+        return prev;
+      }
+      return [...prev, id]; // Toggle On
+    });
+  }, []);
+
+  // Clear skills when returning to menu
+  useEffect(() => {
+    if (gameState === GameState.MENU) {
+      setActiveSkillIds([]);
     }
-  }, [ownedSkills]);
+  }, [gameState]);
 
   // Ref to hold the latest activeRoom state for the interval to access
   const activeRoomRef = useRef<Room | null>(null);
@@ -197,6 +256,7 @@ function App() {
   // Interval ref for cleanup
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initialFetchDoneRef = useRef<boolean>(false);
+  const latestFetchReqIdRef = useRef<number>(0);
 
   // ===========================================
   // LOAD CUSTOM COINS FROM LOCALSTORAGE
@@ -476,7 +536,17 @@ function App() {
 
     if (!initialFetchDoneRef.current || !currentRoom) return;
 
+    // Increment request ID
+    const requestId = Date.now();
+    latestFetchReqIdRef.current = requestId;
+
     const result = await fetchDexScreenerData(currentRoom.tokenAddress);
+
+    // RACE CONDITION CHECK: If a newer request has started, ignore this one
+    if (latestFetchReqIdRef.current !== requestId) {
+      console.log('Discarding stale fetch result');
+      return;
+    }
 
     if (result.success && result.marketCap > 0) {
       const newMultiplier = calculateMultiplier(currentRoom.initialMarketCap, result.marketCap);
@@ -591,6 +661,9 @@ function App() {
     // Perform initial fetch - MUST complete before game can start
     const updatedRoom = await performInitialFetch(room);
 
+    // GUARD: If user switched rooms while fetching, discard this result
+    if (activeRoomRef.current?.id !== room.id) return;
+
     if (updatedRoom) {
       setActiveRoom(updatedRoom);
       setGameState(GameState.START);
@@ -681,16 +754,67 @@ function App() {
   // RENDER
   // ===========================================
 
-  // MENU STATE & AUTH - Full-screen landing page with optional auth overlay
-  if (gameState === GameState.MENU) {
-    const isAuthOverlay = !user;
+  if (window.location.pathname === '/admin') {
+    return <AdminPanel metaCoins={metaCoins} setMetaCoins={setMetaCoins} />;
+  }
 
-    return (
-      <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
+  return (
+    <div className="fixed inset-0 overflow-hidden">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <LiveChat user={user} />
 
-        {/* BACKGROUND CONTENT (Dashboard) */}
-        <div className={`h-full w-full overflow-y-auto min-h-screen transition-all duration-500 ${isAuthOverlay ? 'filter blur-md opacity-50 pointer-events-none select-none grayscale-[0.5]' : ''}`}>
+      {gameState === GameState.MENU ? (
+        <>
+          {/* BACKGROUND CONTENT (Dashboard) */}
+          <div className={`h-full w-full overflow-y-auto min-h-screen transition-all duration-500 ${!user ? 'filter blur-md opacity-50 pointer-events-none select-none grayscale-[0.5]' : ''}`}>
+            <GameUI
+              gameState={gameState}
+              score={score}
+              gameSpeed={gameSpeedDisplay}
+              startGame={startGame}
+              restartGame={restartGame}
+              goToMenu={goToMenu}
+              activeRoom={activeRoom}
+              metaCoins={metaCoins}
+              createdCoins={createdCoins}
+              selectRoom={selectRoom}
+              addCustomCoin={addCustomCoin}
+              removeCustomCoin={removeCustomCoin}
+              user={user}
+              solPrice={solPrice}
+              onWithdraw={handleWithdraw}
+              onLogout={handleLogout}
+              skins={SKINS}
+              skills={SKILLS}
+              ownedSkins={ownedSkins}
+              ownedSkills={ownedSkills}
+              buySkin={buySkin}
+              buySkill={buySkill}
+              equipSkin={equipSkin}
+              equipSkill={equipSkill}
+              selectedSkinId={selectedSkinId}
+              activeSkillIds={activeSkillIds}
+            />
+
+            <div className="fixed bottom-4 text-slate-500 text-xs text-center w-full pixel-font">
+              Degen Runner v3.0 • Real-Time Multiplier • Powered by DexScreener • Live Updates
+            </div>
+          </div>
+
+          {/* AUTH OVERLAY POPUP */}
+          {!user && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40"></div>
+              <AuthModal onLogin={handleLogin} />
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="relative w-full h-full flex items-center justify-center">
+          <div className="absolute inset-0 w-full h-full">
+            {MemoizedGameCanvas}
+          </div>
+
           <GameUI
             gameState={gameState}
             score={score}
@@ -707,6 +831,7 @@ function App() {
             user={user}
             solPrice={solPrice}
             onWithdraw={handleWithdraw}
+            onLogout={handleLogout}
             skins={SKINS}
             skills={SKILLS}
             ownedSkins={ownedSkins}
@@ -719,66 +844,14 @@ function App() {
             activeSkillIds={activeSkillIds}
           />
 
+          {/* Scanlines Effect Overlay */}
+          <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[length:100%_2px,3px_100%]"></div>
+
           <div className="fixed bottom-4 text-slate-500 text-xs text-center w-full pixel-font">
             Degen Runner v3.0 • Real-Time Multiplier • Powered by DexScreener • 5s Updates
           </div>
         </div>
-
-        {/* AUTH OVERLAY POPUP */}
-        {isAuthOverlay && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/40"></div>
-            <AuthModal onLogin={handleLogin} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // GAME STATES - Show canvas with overlays
-  return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
-
-      <div className="relative w-full max-w-[800px] aspect-[2/1] bg-black rounded-lg shadow-2xl overflow-hidden ring-4 ring-slate-800">
-
-        {MemoizedGameCanvas}
-
-        <GameUI
-          gameState={gameState}
-          score={score}
-          gameSpeed={gameSpeedDisplay}
-          startGame={startGame}
-          restartGame={restartGame}
-          goToMenu={goToMenu}
-          activeRoom={activeRoom}
-          metaCoins={metaCoins}
-          createdCoins={createdCoins}
-          selectRoom={selectRoom}
-          addCustomCoin={addCustomCoin}
-          removeCustomCoin={removeCustomCoin}
-          user={user}
-          solPrice={solPrice}
-          onWithdraw={handleWithdraw}
-          skins={SKINS}
-          skills={SKILLS}
-          ownedSkins={ownedSkins}
-          ownedSkills={ownedSkills}
-          buySkin={buySkin}
-          buySkill={buySkill}
-          equipSkin={equipSkin}
-          equipSkill={equipSkill}
-          selectedSkinId={selectedSkinId}
-          activeSkillIds={activeSkillIds}
-        />
-
-        {/* Scanlines Effect Overlay */}
-        <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[length:100%_2px,3px_100%]"></div>
-      </div>
-
-      <div className="fixed bottom-4 text-slate-500 text-xs text-center w-full pixel-font">
-        Degen Runner v3.0 • Real-Time Multiplier • Powered by DexScreener • 5s Updates
-      </div>
+      )}
     </div>
   );
 }

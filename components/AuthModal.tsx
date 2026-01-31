@@ -52,33 +52,33 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin }) => {
     };
 
     return (
-        <div className="terminal-card bg-slate-900 w-full max-w-md p-6 relative animate-fade-in border-green-500/50 shadow-[0_0_50px_rgba(34,197,94,0.1)]">
+        <div className="minecraft-panel-dark w-full max-w-md p-6 relative animate-fade-in shadow-2xl">
 
             {/* Header */}
             <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 pixel-font mb-2">
-                    DEGEN RUNNER
+                <h1 className="text-3xl font-bold text-white pixel-font mb-2 text-shadow">
+                    Rugs Runner
                 </h1>
                 <p className="text-slate-400 text-sm">Connect to the Solana Blockchain</p>
             </div>
 
             {/* Tabs */}
             {!generatedWallet && (
-                <div className="flex mb-6 border-b border-slate-700">
+                <div className="flex mb-6 border-b-4 border-black bg-[#111]">
                     <button
                         onClick={() => { setMode('signup'); setError(null); }}
-                        className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'signup'
-                            ? 'text-green-400 border-b-2 border-green-400'
-                            : 'text-slate-400 hover:text-slate-200'
+                        className={`flex-1 py-3 text-sm font-bold transition-colors ${mode === 'signup'
+                            ? 'bg-[#333] text-white border-b-4 border-[#55ff55]'
+                            : 'text-slate-500 hover:text-slate-300'
                             }`}
                     >
                         NEW PLAYER
                     </button>
                     <button
                         onClick={() => { setMode('signin'); setError(null); }}
-                        className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'signin'
-                            ? 'text-green-400 border-b-2 border-green-400'
-                            : 'text-slate-400 hover:text-slate-200'
+                        className={`flex-1 py-3 text-sm font-bold transition-colors ${mode === 'signin'
+                            ? 'bg-[#333] text-white border-b-4 border-[#55ff55]'
+                            : 'text-slate-500 hover:text-slate-300'
                             }`}
                     >
                         I HAVE A KEY
@@ -98,7 +98,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin }) => {
                         </p>
                         <button
                             onClick={handleGenerate}
-                            className="btn-retro btn-retro-green w-full py-4 text-lg font-bold tracking-widest"
+                            className="btn-minecraft btn-minecraft-green w-full py-4 text-lg font-bold tracking-widest"
                         >
                             GENERATE WALLET
                         </button>
@@ -108,11 +108,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin }) => {
                 {/* SIGN UP SUCCESS - SHOW KEYS */}
                 {generatedWallet && (
                     <div className="animate-fade-in">
-                        <div className="bg-yellow-900/20 border border-yellow-700/50 p-4 rounded mb-6">
-                            <div className="flex items-center gap-2 text-yellow-500 font-bold mb-2">
+                        <div className="bg-[#330000] border-2 border-red-500 p-4 mb-6">
+                            <div className="flex items-center gap-2 text-red-500 font-bold mb-2">
                                 <span>⚠️ IMPORTANT SECURITY WARNING</span>
                             </div>
-                            <p className="text-yellow-200/80 text-xs leading-relaxed">
+                            <p className="text-red-200 text-xs leading-relaxed">
                                 This looks like a game, but this is a REAL Solana Private Key.
                                 <br /><br />
                                 <strong>We do not store this.</strong> If you refresh or close this tab without saving it,
@@ -122,16 +122,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin }) => {
 
                         <div className="mb-4">
                             <label className="text-xs text-slate-500 uppercase tracking-wider mb-1 block">Your Public Address</label>
-                            <div className="bg-black/50 p-3 rounded text-slate-300 font-mono text-xs break-all border border-slate-800">
+                            <div className="bg-[#000] p-3 text-white font-mono text-xs break-all border-2 border-[#555]">
                                 {generatedWallet.publicKey}
                             </div>
                         </div>
 
                         <div className="mb-6">
-                            <label className="text-xs text-green-500 uppercase tracking-wider mb-1 block font-bold">Your Private Key (SECRET)</label>
+                            <label className="text-xs text-[#55ff55] uppercase tracking-wider mb-1 block font-bold">Your Private Key (SECRET)</label>
                             <div
                                 onClick={handleCopy}
-                                className="bg-slate-950 p-4 rounded text-green-400 font-mono text-xs break-all border border-green-900/50 cursor-pointer hover:bg-slate-900 transition-colors relative group"
+                                className="bg-[#000] p-4 text-[#55ff55] font-mono text-xs break-all border-2 border-[#55ff55] cursor-pointer hover:bg-[#111] transition-colors relative group"
                             >
                                 {generatedWallet.secretKey}
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -144,8 +144,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin }) => {
                             onClick={handleCompleteSignup}
                             disabled={!copied}
                             className={`w-full py-4 text-lg font-bold tracking-widest transition-all ${copied
-                                ? 'btn-retro btn-retro-green'
-                                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                                ? 'btn-minecraft btn-minecraft-green'
+                                : 'bg-[#333] text-slate-500 cursor-not-allowed border-4 border-[#444]'
                                 }`}
                         >
                             {copied ? 'I SAVED IT - START GAME' : 'COPY KEY TO CONTINUE'}
@@ -162,19 +162,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin }) => {
                                 value={privateKeyInput}
                                 onChange={(e) => setPrivateKeyInput(e.target.value)}
                                 placeholder="Paste your base58 private key here..."
-                                className="w-full h-32 bg-black/50 border border-slate-700 rounded p-3 text-green-400 font-mono text-xs resize-none focus:outline-none focus:border-green-500 transition-colors"
+                                className="w-full h-32 bg-[#000] border-4 border-[#555] p-3 text-white font-mono text-xs resize-none focus:outline-none focus:border-white transition-colors"
                             />
                         </div>
 
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded text-sm mb-4 text-center">
+                            <div className="bg-red-500/10 border-2 border-red-500 text-red-400 p-3 text-sm mb-4 text-center font-bold">
                                 {error}
                             </div>
                         )}
 
                         <button
                             onClick={handleLogin}
-                            className="btn-retro w-full py-4 text-lg font-bold tracking-widest border-slate-600 text-slate-300 hover:text-white hover:border-slate-400"
+                            className="btn-minecraft w-full py-4 text-lg font-bold tracking-widest"
                         >
                             LOGIN
                         </button>

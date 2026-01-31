@@ -1,5 +1,7 @@
 import { Room, SkillType } from './types';
 
+export const CHAT_SERVER_URL = 'ws://localhost:8080'; // Local backend websocket for development
+
 // Physics
 export const GRAVITY = 0.6;
 export const JUMP_FORCE = -13;
@@ -31,14 +33,15 @@ export const COLOR_HALT = '#eab308';
 // ===========================================
 // MULTIPLIER SETTINGS
 // ===========================================
-export const SENSITIVITY = 5;
+export const SENSITIVITY = 1;
 export const FLOOR_MULTIPLIER = 0.1;
-export const FETCH_INTERVAL_MS = 5000; // 5 seconds - faster updates
+export const FETCH_INTERVAL_MS = 1000; // 1 second - fastest updates
 
 // ===========================================
 // SCORING SETTINGS
 // ===========================================
 export const COIN_VALUE_USD = 0.02; // Each coin collected is worth $0.02 (2 cents)
+export const RED_COIN_VALUE_USD = -0.01; // Red coins take away $0.01
 
 // ===========================================
 // CHART SETTINGS
@@ -143,16 +146,30 @@ export const META_COINS: Room[] = [
 // SKINS
 // ===========================================
 export const SKINS: import('./types').SkinSettings[] = [
-  { id: 'default', name: 'Original Degen', hoodieColor: '#22c55e', pantsColor: '#1e293b', skinColor: '#fca5a5', accessory: 'sunglasses' },
-  { id: 'pepe', name: 'Froggy', hoodieColor: '#4c9f70', pantsColor: '#1a4731', skinColor: '#74c69d', accessory: 'none' },
-  { id: 'chad', name: 'Giga Chad', hoodieColor: '#000000', pantsColor: '#333333', skinColor: '#e0ac69', accessory: 'mask' },
-  { id: 'punk', name: 'Sol Punk', hoodieColor: '#a855f7', pantsColor: '#242424', skinColor: '#ffbf00', accessory: 'headphones' },
-  { id: 'doge', name: 'Doge', hoodieColor: '#eab308', pantsColor: '#854d0e', skinColor: '#fcd34d', accessory: 'hat', accessoryColor: '#ef4444' },
-  { id: 'alien', name: 'Alien', hoodieColor: '#10b981', pantsColor: '#064e3b', skinColor: '#6ee7b7', accessory: 'visor', accessoryColor: '#ec4899' },
-  { id: 'king', name: 'Whale King', hoodieColor: '#3b82f6', pantsColor: '#1e3a8a', skinColor: '#fca5a5', accessory: 'crown', accessoryColor: '#fbbf24' },
-  { id: 'ninja', name: 'Code Ninja', hoodieColor: '#111827', pantsColor: '#000000', skinColor: '#e5e7eb', accessory: 'bandana', accessoryColor: '#ef4444' },
-  { id: 'gentleman', name: 'Sir Degen', hoodieColor: '#4b5563', pantsColor: '#1f2937', skinColor: '#fca5a5', accessory: 'tophat', accessoryColor: '#000000' },
-  { id: 'solana', name: 'Solana Man', hoodieColor: '#9945FF', pantsColor: '#14F195', skinColor: '#fca5a5', accessory: 'cap', accessoryColor: '#000000' },
+  // 1. Standard
+  { id: 'default', name: 'Original Degen', hoodieColor: '#22c55e', pantsColor: '#1e293b', skinColor: '#fca5a5', accessory: 'sunglasses', model: 'human', footwear: 'sneakers' },
+  // 2. Business
+  { id: 'business', name: 'Corporate Shill', hoodieColor: '#374151', pantsColor: '#111827', skinColor: '#e0ac69', accessory: 'tophat', accessoryColor: '#000000', model: 'human', chain: true, footwear: 'boots' },
+  // 3. Big Brain
+  { id: 'brain', name: 'Big Brain', hoodieColor: '#ec4899', pantsColor: '#be185d', skinColor: '#fbcfe8', accessory: 'none', model: 'human', headScale: 1.6, bodyScale: 0.8, footwear: 'sneakers' },
+  // 4. Ninja
+  { id: 'ninja', name: 'Shadow Coder', hoodieColor: '#171717', pantsColor: '#0a0a0a', skinColor: '#262626', accessory: 'bandana', accessoryColor: '#ef4444', model: 'human', footwear: 'boots' },
+  // 5. Golden
+  { id: 'gold', name: 'Whale God', hoodieColor: '#fbbf24', pantsColor: '#b45309', skinColor: '#fcd34d', accessory: 'crown', accessoryColor: '#ffffff', model: 'human', bodyScale: 1.2, chain: true },
+  // 6. Cyber
+  { id: 'cyber', name: 'Cyber Degen', hoodieColor: '#0ea5e9', pantsColor: '#0369a1', skinColor: '#94a3b8', accessory: 'visor', accessoryColor: '#f472b6', model: 'human', footwear: 'sneakers' },
+  // 7. Yeti
+  { id: 'yeti', name: 'Abominable', hoodieColor: '#f8fafc', pantsColor: '#cbd5e1', skinColor: '#bae6fd', accessory: 'none', model: 'human', bodyScale: 1.4, headScale: 1.0, footwear: 'none' },
+  // 8. Devil
+  { id: 'devil', name: 'Rekt Demon', hoodieColor: '#991b1b', pantsColor: '#450a0a', skinColor: '#ef4444', accessory: 'mask', accessoryColor: '#7f1d1d', model: 'human', chain: true, footwear: 'boots' },
+  // 9. Gnome
+  { id: 'gnome', name: 'Garden Gnome', hoodieColor: '#2563eb', pantsColor: '#16a34a', skinColor: '#fca5a5', accessory: 'hat', accessoryColor: '#dc2626', model: 'human', bodyScale: 0.7, headScale: 0.8, footwear: 'boots' },
+  // 10. Alien
+  { id: 'alien', name: 'Moon Visitor', hoodieColor: '#10b981', pantsColor: '#064e3b', skinColor: '#a7f3d0', accessory: 'headphones', accessoryColor: '#6366f1', model: 'human', headScale: 1.2, bodyScale: 0.6, footwear: 'none' },
+
+  // SPECIALS
+  { id: 'penguin', name: 'Pudgy', hoodieColor: '#0f172a', pantsColor: '#fff', skinColor: '#fff', accessory: 'none', model: 'penguin' },
+  { id: 'lobster', name: 'Lobster DAO', hoodieColor: '#dc2626', pantsColor: '#991b1b', skinColor: '#ef4444', accessory: 'none', model: 'lobster' },
 ];
 
 // ===========================================
